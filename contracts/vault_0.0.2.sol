@@ -137,8 +137,19 @@ contract ETHUSDvault is Owned, Context {
   bool public tokenSetFlag;
   bool public oracleLocked;
 
-  uint256 public bearEquity;
-  uint256 public bullEquity;
+
+  struct userLiquidityStruct {
+    uint256 bull;
+    uint256 bear;
+    uint256 carry;
+    uint256 current;
+  }
+
+  //LIQUIDITY VALUES
+  uint256 public totalLiqFees;
+  uint256 public totalLiqShares;
+  mapping(address => uint256) public liqSupply;
+  mapping(address => uint256) public liqShares;
 
 
 
@@ -162,13 +173,13 @@ contract ETHUSDvault is Owned, Context {
     uint256 _tokensToMint = tokenPrice[_token].mul(_ethin.add(_bonus)).div(10**18);
 
     equity[_token] = equity[_token].add(_ethin).add(_bonus);
-    feeRecipient.transfer(_fees);
+    feeRecipient.transfer(_fees.div(2));
+    totalLiqFees += _fees.sub(_fees.div(2));
     _itoken.mint(_account, _tokensToMint);
     emit TokenBuy(_account, _token, _tokensToMint, _amount, _fees, _bonus);
   }
 
-  //VAULT CONTRACT HOLDS ZERO BULL/BEAR TOKENS. THEY (SHOULD) ONYL BE SENT BY A ROUTER CONTRACT.
-  //WHEN SELL FUNCTION IS CALLED ALL TOKENS IN VAULT CONTRACT WILL BE BURNED/SOLD FOR ETH
+
   function tokenSell(address _token, address payable _account) public lock() {
     require(_token == bullToken || _token == bearToken);
     _updatePrice();
@@ -180,11 +191,39 @@ contract ETHUSDvault is Owned, Context {
     uint256 _ethout = _ethraw.sub(_penalty).sub(_fees);
 
     bullEquity = bullEquity.sub(_ethraw);
-    feeRecipient.transfer(_fees);
+    feeRecipient.transfer(_fees.div(2));
+    totalLiqFees += _fees.sub(_fees.div(2));
     _itoken.burn(_tokensToBurn);
     _account.transfer(_ethout);
     emit TokenSell(_account, _token, _tokensToBurn, _ethraw, _fees, _penalty);
   }
+
+  function liquidityAdd() public payable {
+    require(msg.value > 0);
+    uint256 _bullETH = msg.value.div(2);
+    uint256 _bearETH = _bullETH.sub(msg.value);
+    uint256 _shares = msg.value.mul(10**18).div(getSharePrice());
+
+    liqSupply[bullToken] += tokenPrice[bullToken].mul(_bullETH);
+    liqSupply[bearToken] +=tokenPrice[bearToken].mul(_bearETH);
+    liqShares[msg.sender] += _shares;
+    totalLiqShares += _shares;
+  }
+
+  function liquidityRemove(uint256 _amount) public {
+    require(liqSupply[msg.sender] <= _amount);
+    uint256 _eth = _shares.mul(getSharePrice()).div(10**18);
+    uint256 _bullETH = _eth.div(2);
+    uint256 _bearETH = _bullETH.sub(msg.value);
+
+    liqSupply[bullToken] -= tokenPrice[bullToken].mul(_bullETH);
+    liqSupply[bearToken] -=tokenPrice[bearToken].mul(_bearETH);
+    liqShares[msg.sender] -= _shares;
+    totalLiqShares += _shares;
+
+    msg.sender.transfer(_eth);
+  }
+
 
 
 
@@ -217,8 +256,11 @@ contract ETHUSDvault is Owned, Context {
   //ORACLE IS RESPONSIBLE OF CHECKING THAT IT DOESN'T SEND TOO MUCH PRICE DATA TO CAUSE GAS OVERFLOW
   function updatePrice(uint256[] memory _priceData, uint256 _roundId) public {
 
-    uint256 _bullEquity = equity[bullToken];
-    uint256 _bearEquity = equity[bearToken];
+    uint256 _bullPrice = tokenPrice[bullToken];
+    uint256 _bearPrice = tokenPrice[bearToken];
+
+    uint256 _bullEquity = getTokenEquity(bullToken);
+    uint256 _bearEquity = getTokenEquity(bearToken);
     uint256 _totalEquity = getTotalEquity();
     uint256 _movement;
 
@@ -254,7 +296,7 @@ contract ETHUSDvault is Owned, Context {
       }
     }
 
-    if(_bullEquity != bullEquity || _bearEquity != bearEquity) {
+    if(_bullEquity != getTokenEquity(bullToken) || _bearEquity != getTokenEquity(bearToken)) {
       equity[bullToken] = _bullEquity;
       equity[bearToken] = _bearEquity;
 
@@ -263,8 +305,8 @@ contract ETHUSDvault is Owned, Context {
       tokenPrice[bullToken] = 10**18/_bullEquity;
       tokenPrice[bearToken] = 10**18/_bearEquity;
 
-      //tokenPrice[bullToken] = ibullToken.totalSupply().mul(10**18).div(_bullEquity);
-      //tokenPrice[bearToken] = ibearToken.totalSupply().mul(10**18).div(_bearEquity);
+      //tokenPrice[bullToken] = ibullToken.totalSupply().add(liqSupply[bullToken]).mul(10**18).div(_bullEquity);
+      //tokenPrice[bearToken] = ibearToken.totalSupply().add(liqSupply[bearToken]).mul(10**18).div(_bearEquity);
     }
     latestRoundId = _roundId;
 
@@ -275,32 +317,26 @@ contract ETHUSDvault is Owned, Context {
   ///////////////////
   //K FACTOR OF 1 (10^9) REPRESENTS A 1:1 RATIO OF BULL : BEAR EQUITY
   function getKFactor(address _token) public view returns(uint256) {
-    if(equity[bullToken] == 0 || equity[bearToken] == 0) {
+    uint256 _bullEquity = getTokenEquity(bullToken);
+    uint256 _bearEquity = getTokenEquity(bearToken);
+    uint256 _tEquity = getTokenEquity(_token);
+    if(_bullEquity  == 0 || _bearEquity == 0) {
       return(0);
     }
     else {
-      uint256 _equity  = equity[_token] > 0 ? equity[_token] : 1;
+      _tEquity = _tEquity > 0 ? _tEquity : 1;
       uint256 _totalEquity = getTotalEquity();
-      uint256 _kFactor = _totalEquity.mul(10**9).div(_equity.mul(2)) < kControl ? _totalEquity.mul(10**9).div(_equity.mul(2)): kControl;
+      uint256 _kFactor = _totalEquity.mul(10**9).div(_tEquity.mul(2)) < kControl ? _totalEquity.mul(10**9).div(_tEquity.mul(2)): kControl;
       return(_kFactor);
     }
   }
+
   function getKFactors() public view returns(uint256, uint256){
-    if(equity[bullToken] == 0 || equity[bearToken] == 0) {
-      return(0, 0);
-    }
-    else {
-      uint256 _totalEquity = getTotalEquity();
-      uint256 _dbullequity  = equity[bullToken] > 0 ? equity[bullToken].mul(2) : 1;
-      uint256 _dbearequity  = equity[bearToken] > 0 ? equity[bearToken].mul(2) : 1;
-      uint256 _bullKFactor = _totalEquity.mul(10**9).div(_dbullequity) < kControl ? _totalEquity.mul(10**9).div(_dbullequity): kControl;
-      uint256 _bearKFactor = _totalEquity.mul(10**9).div(_dbearequity) < kControl ? _totalEquity.mul(10**9).div(_dbearequity): kControl;
-      return(_bullKFactor, _bearKFactor);
-    }
+    return(getKFactor(bullToken), getKFactor(bearToken));
   }
   function getBonus(address _token, uint256 _ethin) public view returns(uint256){
     uint256 _totalEquity = getTotalEquity();
-    uint256 _equity = equity[_token];
+    uint256 _equity = getTokenEquity(_token);
     uint256 _kFactor = getKFactor(_token);
     bool _t = _kFactor == 0 ? _equity == 0 : true;
     if(_t == true && balanceEquity > 0 && _totalEquity > _equity*2) {
@@ -313,7 +349,7 @@ contract ETHUSDvault is Owned, Context {
   }
   function getPenalty(address _token, uint256 _amount) public view returns(uint256){
     uint256 _totalEquity = getTotalEquity();
-    uint256 _reth = equity[_token].sub(_amount);
+    uint256 _reth = getTokenEquity(_token).sub(_amount);
     if(_totalEquity.div(2) < _reth) {
       return(0);
     }
@@ -324,11 +360,18 @@ contract ETHUSDvault is Owned, Context {
     }
   }
 
+  function getSharePrice() public view returns(uint256) {
+    return(totalLiqFees.mul(10**18).div(totalLiqShares).add(10**18));
+  }
+
   function getLatestRoundId() public view returns(uint256) {
     return(latestRoundId);
   }
   function getTotalEquity() public view returns(uint256) {
-    return(equity[bearToken].add(equity[bullToken]));
+    return(getTokenEquity(bearToken).add(getTokenEquity(bullToken)));
+  }
+  function getTokenEquity(address _token) public view returns(uint256) {
+    return(equity[_token].add(liqSupply[_token]));
   }
 
 
