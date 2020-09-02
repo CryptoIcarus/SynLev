@@ -1,0 +1,32 @@
+{
+  "name": "SynLev Tokens",
+  "logoURI": "ipfs://QmXhrYyLp7T6T8MfQjskmgv6BnRgRnv5Tg3t1bCdG6c8tL",
+  "timestamp": "2020-08-28T00:00:00+00:00",
+  "version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 0
+  },
+  "keywords": [
+    "Leverage",
+    "Synthetic",
+    "staking",
+    "uniswap"
+  ],
+  "tags": {
+    "synlev": {
+      "name": "SynLev",
+      "description": "SynLev core project token. Staking token earning fees from SynLev asset trading on synlev.com"
+    }
+  },
+  "tokens": [
+    {
+      "chainId": 1,
+      "address": "0x1695936d6a953df699C38CA21c2140d497C08BD9",
+      "symbol": "SYN",
+      "name": "SynLev",
+      "decimals": 18,
+      "logoURI": "ipfs://QmSq8jUMRse67vt3Dxqf7DctVm3hpdopbLvScHWiJZrXSg"
+    }
+  ]
+}

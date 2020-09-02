@@ -59,17 +59,50 @@ contract Owned {
 
 
 contract vault is Context, Owned {
-
+  using SignedSafeMath for int256;
+  using SafeMath for uint256;
   constructor() public {
 
   }
 
+  event PriceUpdate(
+    uint256 roundId,
+    uint256 bullPrice,
+    uint256 bearPrice
+  );
+  event TokenBuy(
+    address account,
+    address token,
+    uint256 tokensMinted,
+    uint256 ethin,
+    uint256 fees,
+    uint256 bonus
+  );
+  event TokenSell(
+    address account,
+    address token,
+    uint256 tokensBurned,
+    uint256 ethout,
+    uint256 fees,
+    uint256 penalty
+  );
+  event LiquidityAdd(
+    address account,
+    uint256 eth,
+    uint256 shares,
+    uint256 shareprice
+  );
+  event LiquidityRemove(
+    address account,
+    uint256 eth,
+    uint256 shares,
+    uint256 shareprice
+  );
+
   //token and proxy interfaces
   vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface();  // Put proxy address here
   address public bull;
-  IERC20 public ibull;
   address public bear;
-  IERC20 public ibear;
 
   //Leverage and price control variables
   uint256 constant public multiplier = 3;
@@ -86,10 +119,12 @@ contract vault is Context, Owned {
   synFeesProxyInterface constant public feeRecipientProxy = synFeesProxyInterface();  //Put proxy address (will chain fallback functions)
 
   //Liquidity data
-  uint256 public totalLiqFees;
   uint256 public totalLiqShares;
-  mapping(address => uint256) public liqSupply;
-  mapping(address => uint256) public liqShares;
+  uint256 public liqFees;
+  mapping(address => uint256) public liqTokens;
+  mapping(address => uint256) public liqEquity;
+  mapping(address => uint256) public userShares;
+
 
   //Pricing and equity data
   uint256 public latestRoundId;                     //Last round that we updated price
@@ -105,33 +140,90 @@ contract vault is Context, Owned {
   //          CONTRACTS             //
   ////////////////////////////////////
   function tokenBuy(address token, address account) public payable {
+    require(msg.value >= minBuy);
+    require(token == bull || token == bear);
+    updatePrice();
 
+    IERC20 itkn = IERC20(token);
+    uint256 fees = msg.value.mul(buyFee).div(10**8);
+    uint256 buyeth = amount - fees;
+    uint256 bonus = getBonus(token, buyeth);
+    uint256 tokensToMint = buyeth.add(bonus).mul(10**18).div(price[token]);
+
+    equity[token] = equity[token].add(msg.value).add(bonus);
+    payFees(fees);
+    itkn.mint(account, tokensToMint);
+    emit TokenBuy(account, token, tokensToMint, msg.value, fees, bonus);
   }
 
-  function tokenSell(address token, address payable account) public{
+  function tokenSell(address token, address payable account) public {
+    require(token == bull || token == bear);
+    updatePrice();
 
+    IERC20 itkn = IERC20(token);
+    uint256 tokensToBurn = itoken.balanceOf(address(this));
+    uint256 selleth = tokensToBurn.mul(price[_token]).div(10**18);
+    uint256 penalty = getPenalty(token, selleth);
+    uint256 fees = sellFee.mul(selleth.sub(penalty)).div(10**8);
+    uint256 ethout = selleth.sub(penalty).sub(fees);
+
+    equity[token] = equity[token].sub(ethout);
+    payFees(fees);
+    itkn.burn(tokensToBurn);
+    acount.transfer(ethout);
+    emit TokenSell(account, token, tokensToBurn, selleth, fees, penalty);
   }
 
-  function liquidityAdd() public payable {
-
+  function liquidityAdd(address account) public payable {
+    require(msg.value > 0);
+    uint256 eth = msg.value;
+    uint256 sharePrice = getSharePrice();
+    uint256 newShares = eth.mul(10**18).div(sharePrice); //Maybe need to mod to avoid < 0 edge case
+    (
+      uint256 bullEquity,
+      uint256 bearEquity,
+      uint256 bullTokens,
+      uint256 bearTokens
+    ) = getLiqAddTokens(eth);
+    if(bullEquity != 0) {
+      liqEquity[bull] = liqEquity[bull].add(bullEquity);
+      liqTokens[bull] = liqTokens[bull].add(bullTokens);
+    }
+    if(bearEquity != 0) {
+      liqEquity[bear] = liqEquity[bear].add(bearEquity);
+      liqTokens[bear] = liqTokens[bear].add(bearTokens);
+    }
+    userShares[account] = userShares[account].add(newShares);
+    emit LiquidityAdd(account, eth, newShares, sharePrice);
   }
 
   function liquidityRemove(uint256 amount) public {
-
+    require(amount > 0);
+    require(userShares[msg.sender] <= amount);
+    uint256 sharePrice = getSharePrice();
+    uint256 eth = sharePrice.mul(amount).div(10**18);
+    (
+      uint256 bullEquity,
+      uint256 bearEquity,
+      uint256 bullTokens,
+      uint256 bearTokens
+    ) = getLiqRemoveTokens(eth);
+    if(bullEquity != 0) {
+      liqEquity[bull] = liqEquity[bull].sub(bullEquity);
+      liqTokens[bull] = liqTokens[bull].sub(bullTokens);
+    }
+    if(bearEquity != 0) {
+      liqEquity[bear] = liqEquity[bear].sub(bearEquity);
+      liqTokens[bear] = liqTokens[bear].sub(bearTokens);
+    }
+    userShares[account] = userShares[account].sub(amount);
+    emit liquidityRemove(account, eth, newShares, sharePrice);
   }
 
 
-  //ANYONE CAN UPDATE PRICE DATA AT ANY TIME. GIVEN THAT THERE IS A PRICE TO UPDATE
-  function publicUpdatePrice() public {
-    int256[] memory priceData;
-    uint256 roundId;
-    (priceData, roundId) = priceProxy.getPriceData();
-    require(priceData.length >= 2);
-    updatePrice(priceData, roundId);
-  }
 
-  //PRIVATE PRICE UPDATE RETURNS A BOOL
-  function _updatePrice() private returns(bool) {
+  //PUBLIC PRICE UPDATE RETURNS A BOOL IF NO PRICE UPDATE NEEDED
+  function updatePrice() public returns(bool) {
     int256[] memory priceData;
     uint256 roundId;
     (priceData, roundId) = priceProxy.getPriceData();
@@ -149,9 +241,60 @@ contract vault is Context, Owned {
   //TAKES RAW PRICE DATA
   //PUBLIC FUNCTIONS RUN SAFETY CHECKS
   //ORACLE IS RESPONSIBLE OF CHECKING THAT IT DOESN'T SEND TOO MUCH PRICE DATA TO CAUSE GAS OVERFLOW
-  function updatePrice(uint256[] memory priceData, uint256 roundId) public {
+  function _updatePrice(uint256[] memory priceData, uint256 roundId) internal {
+    uint256 bullEquity = getTokenEquity(bullToken);
+    uint256 bearEquity = getTokenEquity(bearToken);
+    uint256 tEquity = getTotalEquity();
+    uint256 movement;
 
+    uint256 bearKFactor;
+    uint256 bullKFactor;
 
+    uint256 pricedelta;
+
+    for (uint i = 1; i < _priceData.length; i++) {
+      bullKFactor = getKFactor(bull, bullEquity, bearEquity, tEquity);
+      bearKFactor = getKFactor(bear, bullEquity, bearEquity, tEquity);
+      //BEARISH MOVEMENT, CALC BULL DATA
+      if(_priceData[i-1] != _priceData[i]) {
+        if(_priceData[i-1] > _priceData[i]) {
+          pricedelta = priceData[i-1].mul(10**18).div(priceData[i]).sub(10**18);
+          pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**18);
+          pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+          movement = bullEquity.mul(pricedelta).div(10**18);
+          bearEquity = bearEquity.add(_movement);
+          bullEquity = totalEquity.sub(_bearEquity);
+        }
+        //BULLISH MOVEMENT
+        else if(_priceData[i-1] < _priceData[i]) {
+          pricedelta = priceData[i].mul(10**18).div(priceData[i-1]).sub(10**18);
+          pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**18);
+          pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+          movement = bearEquity.mul(pricedelta).div(10**18);
+          bullEquity = bullEquity.add(movement);
+          bearEquity = totalEquity.sub(bullEquity);
+        }
+      }
+    }
+    if(bullEquity != getTokenEquity(bullToken) || bearEquity != getTokenEquity(bearToken)) {
+      price[bull] = bullEquity.mul(10**18).div(IERC20(bull).totalSupply().add(liqTokens[bull]));
+      price[bear] = bearEquity.mul(10**18).div(IERC20(bear).totalSupply().add(liqTokens[bear]));
+
+      liqEquity[bull] = price[bull].mul(liqTokens[bull]).div(10**18);
+      liqEquity[bear] = price[bear].mul(liqTokens[bear]).div(10**18);
+
+      equity[bull] = bullEquity.sub(liqEquity[bull]);
+      equity[bear] = bearEquity.sub(liqEquity[bear]);
+
+    }
+
+    latestRoundId = roundId;
+    emit PriceUpdate(latestRoundId, price[bull], price[bear]);
+  }
+
+  function payFees(uint256 amount) internal {
+    feeRecipientProxy.transfer(amount.div(2));
+    totalLiqEth += _fees.sub(amount.div(2));
   }
 
 
@@ -160,12 +303,19 @@ contract vault is Context, Owned {
   ///VIEW FUNCTIONS//
   ///////////////////
   //K FACTOR OF 1 (10^9) REPRESENTS A 1:1 RATIO OF BULL : BEAR EQUITY
-  function getKFactor(address _token) public view returns(uint256) {
-
-  }
-
-  function getKFactors() public view returns(uint256, uint256) {
-    return(getKFactor(bullToken), getKFactor(bearToken));
+  function getKFactor(address token, uint256 bullEquity, uint256 bearEquity, uint256 tEquity)
+    public
+    view
+    returns(uint256) {
+    if(bullEquity  == 0 || bearEquity == 0) {
+      return(0);
+    }
+    else {
+      tEquity = tEquity > 0 ? tEquity : 1;
+      uint256 totalEquity = getTotalEquity();
+      uint256 kFactor = totalEquity.mul(10**9).div(tEquity.mul(2)) < kControl ? totalEquity.mul(10**9).div(tEquity.mul(2)): kControl;
+      return(kFactor);
+    }
   }
 
   function getBonus(address _token, uint256 _ethin) public view returns(uint256) {
@@ -177,7 +327,87 @@ contract vault is Context, Owned {
   }
 
   function getSharePrice() public view returns(uint256) {
+    if(totalLiqShares == 0) {
+      return(liqEquity[bull].add(liqEquity[bear]).add(liqFees).add(10**18));
+    }
+    else {
+      return(liqEquity[bull].add(liqEquity[bear]).add(liqFees).mul(10**18).div(totalLiqShares));
+    }
+  }
+  //PROBABLY WILL NOT USE
+  function getEqualTokens(uint256 eth) public view returns(uint256, uint256) {
+    uint256 bulltkns = eth.div(2).mul(price[bull]).div(10**18);
+    uint256 beartkns = eth.sub(eth.div(2)).mul(price[bull]).div(10**18);
+    return(bulltkns, beartkns);
+  }
+  function getLiqAddTokens(uint256 eth)
+    public
+    view
+    returns(
+      uint256 rbullEquity,
+      uint256 rbearEquity,
+      uint256 rbullToknes,
+      uint256 rbearTokens
+    ) {
+    uint256 bullEquity = liqEquity[bull] < liqEquity[bear] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
+    uint256 bearEquity = liqEquity[bear] < liqEquity[bull] ? liqEquity[bull].sub(liqEquity[bear]) : 0 ;
 
+    if(bullEquity >= eth) bullEquity = eth;
+    else if(bearEquity >= eth) bearEquity = eth;
+    else if(bullEquity > bearEquity) {
+      bullEquity = bullEquity.add(eth.sub(bullEquity).div(2));
+      bearEquity = eth.sub(bullEquity);
+    else if(bearEquity > bullEquity) {
+      bearEquity = bearEquity.add(eth.sub(bearEquity).div(2));
+      bullEquity = eth.sub(bearEquity);
+    }
+    else {
+      bullEquity = eth.div(2);
+      bearEquity = eth.sub(bullEquity);
+    }
+    return(
+      bullEquity,
+      bearEquity,
+      bullEquity.mul(10**18).div(price[bull]),
+      bearEquity.mul(10**18).div(price[bear])
+    );
+  }
+  function getLiqRemoveTokens(uint256 eth)
+    public
+    view
+    returns(
+      uint256 rbullEquity,
+      uint256 rbearEquity,
+      uint256 rbullToknes,
+      uint256 rbearTokens
+    ) {
+    uint256 bullEquity = liqEquity[bull] > liqEquity[bear] ? liqEquity[bull].sub(liqEquity[bear]) : 0 ;
+    uint256 bearEquity = liqEquity[bear] > liqEquity[bull] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
+
+    if(bullEquity >= eth) bullEquity = eth;
+    else if(bearEquity >= eth) bearEquity = eth;
+    else if(bullEquity > bearEquity) {
+      bullEquity = bullEquity.add(eth.sub(bullEquity).div(2));
+      bearEquity = eth.sub(bullEquity);
+    }
+    else if(bearEquity > bullEquity) {
+      bearEquity = bearEquity.add(eth.sub(bearEquity).div(2));
+      bullEquity = eth.sub(bearEquity);
+    }
+    else {
+      bullEquity = eth.div(2);
+      bearEquity = eth.sub(bullEquity);
+    }
+    uint256 bullTokens = bullEquity.mul(10**18).div(price[bull]);
+    uint256 bearTokens = bearEquity.mul(10**18).div(price[bear]);
+    bullTokens = bullTokens > liqTokens[bull] ? liqTokens[bull] : bullTokens;
+    bearTokens = bearTokens > liqTokens[bear] ? liqTokens[bear] : bearTokens;
+      return(
+        bullEquity,
+        bearEquity,
+        bullTokens
+        bearTokens
+      );
   }
 
   function getLatestRoundId() public view returns(uint256) {
@@ -185,11 +415,14 @@ contract vault is Context, Owned {
   }
 
   function getTotalEquity() public view returns(uint256) {
-
+    return(getTokenEquity(bear).add(getTokenEquity(bull));
   }
 
   function getTokenEquity(address _token) public view returns(uint256) {
-
+    return(equity[_token].add(liqEquity[_token]));
+  }
+  function getTokenLiqEquity(address token) public view returns(uint256) {
+    return(liqTokens[token].mul(price[token]).div(10**18));
   }
 
   ///////////////////
@@ -199,18 +432,7 @@ contract vault is Context, Owned {
   //Cannot be included in constructor as vault must be deployed before tokens.
   function setTokens(address bearAddress, address bullAddress) public onlyOwner() {
     require(bear != address(0) || bull != address(0));
-    (
-      bull,
-      ibull,
-      bear,
-      ibear
-    ) =
-    (
-      bullAddress,
-      IERC20(bullAddress)
-      bearAddress,
-      IERC20(bearAddress)
-    )
+    (bull, bear) = (bullAddress, bearAddress);
   }
 
   //FEES IN THE FORM OF 1 / 10^8
@@ -240,4 +462,82 @@ contract vault is Context, Owned {
 
 
 
+}
+
+library SafeMath {
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a, "SafeMath: addition overflow");
+
+        return c;
+    }
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        return sub(a, b, "SafeMath: subtraction overflow");
+    }
+    function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        require(b <= a, errorMessage);
+        uint256 c = a - b;
+
+        return c;
+    }
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+
+        uint256 c = a * b;
+        require(c / a == b, "SafeMath: multiplication overflow");
+
+        return c;
+    }
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        return div(a, b, "SafeMath: division by zero");
+    }
+    function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        require(b > 0, errorMessage);
+        uint256 c = a / b;
+        return c;
+    }
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+        return mod(a, b, "SafeMath: modulo by zero");
+    }
+    function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        require(b != 0, errorMessage);
+        return a % b;
+    }
+}
+library SignedSafeMath {
+    int256 constant private _INT256_MIN = -2**255;
+    function mul(int256 a, int256 b) internal pure returns (int256) {
+        if (a == 0) {
+            return 0;
+        }
+
+        require(!(a == -1 && b == _INT256_MIN), "SignedSafeMath: multiplication overflow");
+
+        int256 c = a * b;
+        require(c / a == b, "SignedSafeMath: multiplication overflow");
+
+        return c;
+    }
+    function div(int256 a, int256 b) internal pure returns (int256) {
+        require(b != 0, "SignedSafeMath: division by zero");
+        require(!(b == -1 && a == _INT256_MIN), "SignedSafeMath: division overflow");
+
+        int256 c = a / b;
+
+        return c;
+    }
+    function sub(int256 a, int256 b) internal pure returns (int256) {
+        int256 c = a - b;
+        require((b >= 0 && c <= a) || (b < 0 && c > a), "SignedSafeMath: subtraction overflow");
+
+        return c;
+    }
+    function add(int256 a, int256 b) internal pure returns (int256) {
+        int256 c = a + b;
+        require((b >= 0 && c >= a) || (b < 0 && c < a), "SignedSafeMath: addition overflow");
+
+        return c;
+    }
 }

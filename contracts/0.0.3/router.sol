@@ -37,16 +37,7 @@ contract Owned {
   }
 }
 
-contract synFeeProxy is Context, Owned {
 
-  address payable public feeRecipient;
-
-  function() external payable {
-    feeRecipient.transfer(msg.value);
-  }
-
-
-  function setFeeRecipient(address account) public onlyOwner() {
-    feeRecipient = account;
-  }
+contract vaultRouter is Context, Owned {
+  
 }
