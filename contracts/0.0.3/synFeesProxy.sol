@@ -1,3 +1,7 @@
+//////////////////////////////////////////////////
+//SYNLEV FEES PROXY CONTRACT V 0.0.3
+//////////////////////////
+
 pragma solidity >= 0.6.4;
 
 contract Context {
@@ -42,7 +46,7 @@ contract synFeeProxy is Context, Owned {
   address payable public feeRecipient;
 
   function() external payable {
-    feeRecipient.transfer(msg.value);
+    feeRecipient.transfer(address(this).balance);
   }
 
 

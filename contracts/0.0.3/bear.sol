@@ -1,3 +1,10 @@
+//////////////////////////////////////////////////
+//SYNLEV BEAR CONTRACT V 0.0.3
+//////////////////////////
+
+//THIS IS STANDARD OPENZEPLIN ERC-20 CONTRACT WITH BURN/MINT RESTRICTED TO VAULT
+//CONTRACT
+
 pragma solidity >= 0.6.4;
 
 contract Context {
@@ -93,8 +100,7 @@ contract bear is IERC20, Context, Owned {
   function mint(address account, uint256 amount) public onlyVault() {
     _mint(account, amount);
   }
-  function burn(uint256 amount) public {
-    address account = msg.sender;
+  function burn(address account, uint256 amount) public onlyVault() {
     _burn(account, amount);
   }
 

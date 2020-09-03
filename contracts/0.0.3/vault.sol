@@ -1,10 +1,14 @@
+//////////////////////////////////////////////////
+//SYNLEV VAULT CONTRACT V 0.0.3
+//////////////////////////
+
 pragma solidity >= 0.6.4;
 
 interface vaultPriceAggregatorInterface {
   function priceRequest(address vault, uint256 lastUpdated) external view returns(uint256[] memory, uint256);
 }
 interface synFeesProxyInterface {
-  function feesToStaking(uint256 amount) external view returns();
+  function feesToStaking(uint256 amount) external;
 }
 
 interface IERC20 {
@@ -100,7 +104,7 @@ contract vault is Context, Owned {
   );
 
   //token and proxy interfaces
-  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface();  // Put proxy address here
+  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(address(0));  // Put proxy address here
   address public bull;
   address public bear;
 
@@ -116,7 +120,7 @@ contract vault is Context, Owned {
   //FEES TAKEN AS A PRECENTAGE SCALED 10^8
   uint256 public buyFee;
   uint256 public sellFee;
-  synFeesProxyInterface constant public feeRecipientProxy = synFeesProxyInterface();  //Put proxy address (will chain fallback functions)
+  address payable constant public feeRecipientProxy = address(0);  //Put proxy address (will chain fallback functions)
 
   //Liquidity data
   uint256 public totalLiqShares;
@@ -146,7 +150,7 @@ contract vault is Context, Owned {
 
     IERC20 itkn = IERC20(token);
     uint256 fees = msg.value.mul(buyFee).div(10**8);
-    uint256 buyeth = amount - fees;
+    uint256 buyeth = msg.value - fees;
     uint256 bonus = getBonus(token, buyeth);
     uint256 tokensToMint = buyeth.add(bonus).mul(10**18).div(price[token]);
 
@@ -161,8 +165,8 @@ contract vault is Context, Owned {
     updatePrice();
 
     IERC20 itkn = IERC20(token);
-    uint256 tokensToBurn = itoken.balanceOf(address(this));
-    uint256 selleth = tokensToBurn.mul(price[_token]).div(10**18);
+    uint256 tokensToBurn = itkn.balanceOf(address(this));
+    uint256 selleth = tokensToBurn.mul(price[token]).div(10**18);
     uint256 penalty = getPenalty(token, selleth);
     uint256 fees = sellFee.mul(selleth.sub(penalty)).div(10**8);
     uint256 ethout = selleth.sub(penalty).sub(fees);
@@ -170,7 +174,7 @@ contract vault is Context, Owned {
     equity[token] = equity[token].sub(ethout);
     payFees(fees);
     itkn.burn(tokensToBurn);
-    acount.transfer(ethout);
+    account.transfer(ethout);
     emit TokenSell(account, token, tokensToBurn, selleth, fees, penalty);
   }
 
@@ -216,19 +220,19 @@ contract vault is Context, Owned {
       liqEquity[bear] = liqEquity[bear].sub(bearEquity);
       liqTokens[bear] = liqTokens[bear].sub(bearTokens);
     }
-    userShares[account] = userShares[account].sub(amount);
-    emit liquidityRemove(account, eth, newShares, sharePrice);
+    userShares[msg.sender] = userShares[msg.sender].sub(amount);
+    emit LiquidityRemove(msg.sender, eth, amount, sharePrice);
   }
 
 
 
   //PUBLIC PRICE UPDATE RETURNS A BOOL IF NO PRICE UPDATE NEEDED
   function updatePrice() public returns(bool) {
-    int256[] memory priceData;
+    uint256[] memory priceData;
     uint256 roundId;
-    (priceData, roundId) = priceProxy.getPriceData();
+    (priceData, roundId) = priceProxy.priceRequest(address(this), latestRoundId);
     if(priceData.length >= 2) {
-      updatePrice(priceData, roundId);
+      _updatePrice(priceData, roundId);
       return(true);
     }
     else {
@@ -242,9 +246,9 @@ contract vault is Context, Owned {
   //PUBLIC FUNCTIONS RUN SAFETY CHECKS
   //ORACLE IS RESPONSIBLE OF CHECKING THAT IT DOESN'T SEND TOO MUCH PRICE DATA TO CAUSE GAS OVERFLOW
   function _updatePrice(uint256[] memory priceData, uint256 roundId) internal {
-    uint256 bullEquity = getTokenEquity(bullToken);
-    uint256 bearEquity = getTokenEquity(bearToken);
-    uint256 tEquity = getTotalEquity();
+    uint256 bullEquity = getTokenEquity(bull);
+    uint256 bearEquity = getTokenEquity(bear);
+    uint256 totalEquity = getTotalEquity();
     uint256 movement;
 
     uint256 bearKFactor;
@@ -252,21 +256,21 @@ contract vault is Context, Owned {
 
     uint256 pricedelta;
 
-    for (uint i = 1; i < _priceData.length; i++) {
-      bullKFactor = getKFactor(bull, bullEquity, bearEquity, tEquity);
-      bearKFactor = getKFactor(bear, bullEquity, bearEquity, tEquity);
+    for (uint i = 1; i < priceData.length; i++) {
+      bullKFactor = getKFactor(bull, bullEquity, bearEquity, totalEquity);
+      bearKFactor = getKFactor(bear, bullEquity, bearEquity, totalEquity);
       //BEARISH MOVEMENT, CALC BULL DATA
-      if(_priceData[i-1] != _priceData[i]) {
-        if(_priceData[i-1] > _priceData[i]) {
+      if(priceData[i-1] != priceData[i]) {
+        if(priceData[i-1] > priceData[i]) {
           pricedelta = priceData[i-1].mul(10**18).div(priceData[i]).sub(10**18);
           pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**18);
           pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
           movement = bullEquity.mul(pricedelta).div(10**18);
-          bearEquity = bearEquity.add(_movement);
-          bullEquity = totalEquity.sub(_bearEquity);
+          bearEquity = bearEquity.add(movement);
+          bullEquity = totalEquity.sub(bearEquity);
         }
         //BULLISH MOVEMENT
-        else if(_priceData[i-1] < _priceData[i]) {
+        else if(priceData[i-1] < priceData[i]) {
           pricedelta = priceData[i].mul(10**18).div(priceData[i-1]).sub(10**18);
           pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**18);
           pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
@@ -276,7 +280,7 @@ contract vault is Context, Owned {
         }
       }
     }
-    if(bullEquity != getTokenEquity(bullToken) || bearEquity != getTokenEquity(bearToken)) {
+    if(bullEquity != getTokenEquity(bull) || bearEquity != getTokenEquity(bear)) {
       price[bull] = bullEquity.mul(10**18).div(IERC20(bull).totalSupply().add(liqTokens[bull]));
       price[bear] = bearEquity.mul(10**18).div(IERC20(bear).totalSupply().add(liqTokens[bear]));
 
@@ -294,7 +298,7 @@ contract vault is Context, Owned {
 
   function payFees(uint256 amount) internal {
     feeRecipientProxy.transfer(amount.div(2));
-    totalLiqEth += _fees.sub(amount.div(2));
+    liqFees += amount.sub(amount.div(2));
   }
 
 
@@ -303,7 +307,7 @@ contract vault is Context, Owned {
   ///VIEW FUNCTIONS//
   ///////////////////
   //K FACTOR OF 1 (10^9) REPRESENTS A 1:1 RATIO OF BULL : BEAR EQUITY
-  function getKFactor(address token, uint256 bullEquity, uint256 bearEquity, uint256 tEquity)
+  function getKFactor(address token, uint256 bullEquity, uint256 bearEquity, uint256 totalEquity)
     public
     view
     returns(uint256) {
@@ -311,19 +315,38 @@ contract vault is Context, Owned {
       return(0);
     }
     else {
-      tEquity = tEquity > 0 ? tEquity : 1;
-      uint256 totalEquity = getTotalEquity();
-      uint256 kFactor = totalEquity.mul(10**9).div(tEquity.mul(2)) < kControl ? totalEquity.mul(10**9).div(tEquity.mul(2)): kControl;
+      uint256 tokenEquity = getTokenEquity(token);
+      tokenEquity = tokenEquity > 0 ? tokenEquity : 1;
+      uint256 kFactor = totalEquity.mul(10**9).div(tokenEquity.mul(2)) < kControl ? totalEquity.mul(10**9).div(tokenEquity.mul(2)): kControl;
       return(kFactor);
     }
   }
 
-  function getBonus(address _token, uint256 _ethin) public view returns(uint256) {
-
+  function getBonus(address token, uint256 eth) public view returns(uint256) {
+    uint256 totalEquity = getTotalEquity();
+    uint256 tokenEquity = getTokenEquity(token);
+    uint256 kFactor = getKFactor(token, getTokenEquity(bull), getTokenEquity(bear), totalEquity);
+    bool t = kFactor == 0 ? tokenEquity == 0 : true;
+    if(t == true && balanceEquity > 0 && totalEquity > tokenEquity * 2) {
+      uint256 bonus = tokenEquity.add(eth).div(totalEquity.sub(tokenEquity)) == 0 ? eth.mul(balanceEquity).mul(10**9).div(totalEquity.div(2).sub(tokenEquity)).div(10**9) : balanceEquity;
+      return(bonus);
+    }
+    else {
+      return(0);
+    }
   }
 
-  function getPenalty(address _token, uint256 _amount) public view returns(uint256) {
-
+  function getPenalty(address token, uint256 eth) public view returns(uint256) {
+    uint256 totalEquity = getTotalEquity();
+    uint256 reth = getTokenEquity(token).sub(eth);
+    if(totalEquity.div(2) >= reth) {
+      uint256 penalty = balanceControlFactor.mul(eth.mul(reth.mul(2)));
+      penalty = penalty.div(totalEquity.sub(eth)).div(10**9);
+      return(penalty);
+    }
+    else {
+      return(0);
+    }
   }
 
   function getSharePrice() public view returns(uint256) {
@@ -357,6 +380,7 @@ contract vault is Context, Owned {
     else if(bullEquity > bearEquity) {
       bullEquity = bullEquity.add(eth.sub(bullEquity).div(2));
       bearEquity = eth.sub(bullEquity);
+    }
     else if(bearEquity > bullEquity) {
       bearEquity = bearEquity.add(eth.sub(bearEquity).div(2));
       bullEquity = eth.sub(bearEquity);
@@ -405,17 +429,17 @@ contract vault is Context, Owned {
       return(
         bullEquity,
         bearEquity,
-        bullTokens
+        bullTokens,
         bearTokens
       );
   }
 
   function getLatestRoundId() public view returns(uint256) {
-
+    return(latestRoundId);
   }
 
   function getTotalEquity() public view returns(uint256) {
-    return(getTokenEquity(bear).add(getTokenEquity(bull));
+    return(getTokenEquity(bear).add(getTokenEquity(bull)));
   }
 
   function getTokenEquity(address _token) public view returns(uint256) {
@@ -441,7 +465,7 @@ contract vault is Context, Owned {
   }
   //SELL FEES LIMITED TO A MAXIMUM OF 1%
   function setSellFee(uint256 amount) public onlyOwner() {
-    require(_amount <= 100000);
+    require(amount <= 100000);
     sellFee = amount;
   }
   function setMinBuy(uint256 amount) public onlyOwner() {
