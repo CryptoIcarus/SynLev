@@ -67,9 +67,9 @@ contract bear is IERC20, Context, Owned {
 
   constructor() public {
     symbol = "BEAR";
-    name = "3xBEAR";
-    decimals = 8;
-    vault = ;
+    name = "3xBEARETH/USD";
+    decimals = 18;
+    vault = 0xc09d7B693c79F8BEF1bB6368197e735935f66DC2;
   }
 
   modifier onlyVault {
@@ -97,10 +97,10 @@ contract bear is IERC20, Context, Owned {
     token.transfer(msg.sender, amount);
   }
 
-  function mint(address account, uint256 amount) public onlyVault() {
+  function mint(address account, uint256 amount) public override onlyVault() {
     _mint(account, amount);
   }
-  function burn(address account, uint256 amount) public onlyVault() {
+  function burn(address account, uint256 amount) public override onlyVault() {
     _burn(account, amount);
   }
 

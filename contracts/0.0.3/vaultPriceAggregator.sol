@@ -72,20 +72,20 @@ contract price_oracle_integrator is Context, Owned {
   function priceRequest(address vault, uint256 lastUpdated)
   public
   view
-  returns(int256[] memory, uint256)
+  returns(uint256[] memory, uint256)
   {
     uint256 currentRound = refVault[vault].ref.latestRound();
-    int256[] memory pricearray;
+    uint256[] memory pricearray;
     if(currentRound > lastUpdated) {
       uint256 pricearrayLength = 1 + currentRound - lastUpdated;
-      pricearray = new int256[] (pricearrayLength);
+      pricearray = new uint256[] (pricearrayLength);
       for(uint i = 0; i < pricearrayLength; i++) {
-        pricearray[i] = refVault[vault].ref.getAnswer(lastUpdated + i);
+        pricearray[i] = uint256(refVault[vault].ref.getAnswer(lastUpdated + i));
       }
       return(pricearray, currentRound);
     }
     else {
-      return(new int256[](0), lastUpdated);
+      return(new uint256[](0), lastUpdated);
     }
   }
 
@@ -98,7 +98,7 @@ contract price_oracle_integrator is Context, Owned {
   //to chainlink aggregator contract connections
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-  //Can only be called by vault contracts constructor, initiates pair
+  //Can only be called by vault proxy, initiates pair
   function registerVaultAggregator(address aggregator) public {
     refVault[msg.sender].ref = AggregatorInterface(aggregator);
   }

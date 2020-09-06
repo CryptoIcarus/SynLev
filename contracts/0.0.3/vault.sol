@@ -10,6 +10,9 @@ interface vaultPriceAggregatorInterface {
 interface synFeesProxyInterface {
   function feesToStaking(uint256 amount) external;
 }
+interface priceAggregator {
+  function registerVaultAggregator(address aggregator) external;
+}
 
 interface IERC20 {
   function totalSupply() external view returns (uint256);
@@ -63,10 +66,9 @@ contract Owned {
 
 
 contract vault is Context, Owned {
-  using SignedSafeMath for int256;
   using SafeMath for uint256;
   constructor() public {
-
+    priceAggregator(0x91a366C4cA2592B01846abc44B10AE9c08Db7cF9).registerVaultAggregator(0x30B5068156688f818cEa0874B580206dFe081a03);
   }
 
   event PriceUpdate(
@@ -104,7 +106,7 @@ contract vault is Context, Owned {
   );
 
   //token and proxy interfaces
-  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(address(0));  // Put proxy address here
+  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(0x975efdF5643cbe4d512302D6CF587777BCbB2f4C);  // Put proxy address here
   address public bull;
   address public bear;
 
@@ -120,7 +122,7 @@ contract vault is Context, Owned {
   //FEES TAKEN AS A PRECENTAGE SCALED 10^8
   uint256 public buyFee;
   uint256 public sellFee;
-  address payable constant public feeRecipientProxy = address(0);  //Put proxy address (will chain fallback functions)
+  address payable constant public feeRecipientProxy = 0xB376d5B864248C3e7587A306e667518356dd0cb2;  //Put proxy address (will chain fallback functions)
 
   //Liquidity data
   uint256 public totalLiqShares;
@@ -454,9 +456,12 @@ contract vault is Context, Owned {
   ///////////////////
   //ONE TIME USE FUNCTION TO SET TOKEN ADDRESSES. THIS CAN NEVER BE CHANGED ONCE SET.
   //Cannot be included in constructor as vault must be deployed before tokens.
-  function setTokens(address bearAddress, address bullAddress) public onlyOwner() {
-    require(bear != address(0) || bull != address(0));
+  function setTokens(address bearAddress, address bullAddress, uint256 roundId) public onlyOwner() {
+    require(bear == address(0) || bull == address(0));
     (bull, bear) = (bullAddress, bearAddress);
+    (price[bull], price[bear]) = ( 10**18, 10**18 );
+    latestRoundId = roundId;
+
   }
 
   //FEES IN THE FORM OF 1 / 10^8
@@ -500,7 +505,7 @@ library SafeMath {
     }
     function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         require(b <= a, errorMessage);
-        uint256 c = a - b;
+        uint256 c = a - b;using SafeMath for uint256;
 
         return c;
     }
@@ -528,40 +533,5 @@ library SafeMath {
     function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         require(b != 0, errorMessage);
         return a % b;
-    }
-}
-library SignedSafeMath {
-    int256 constant private _INT256_MIN = -2**255;
-    function mul(int256 a, int256 b) internal pure returns (int256) {
-        if (a == 0) {
-            return 0;
-        }
-
-        require(!(a == -1 && b == _INT256_MIN), "SignedSafeMath: multiplication overflow");
-
-        int256 c = a * b;
-        require(c / a == b, "SignedSafeMath: multiplication overflow");
-
-        return c;
-    }
-    function div(int256 a, int256 b) internal pure returns (int256) {
-        require(b != 0, "SignedSafeMath: division by zero");
-        require(!(b == -1 && a == _INT256_MIN), "SignedSafeMath: division overflow");
-
-        int256 c = a / b;
-
-        return c;
-    }
-    function sub(int256 a, int256 b) internal pure returns (int256) {
-        int256 c = a - b;
-        require((b >= 0 && c <= a) || (b < 0 && c > a), "SignedSafeMath: subtraction overflow");
-
-        return c;
-    }
-    function add(int256 a, int256 b) internal pure returns (int256) {
-        int256 c = a + b;
-        require((b >= 0 && c >= a) || (b < 0 && c < a), "SignedSafeMath: addition overflow");
-
-        return c;
     }
 }

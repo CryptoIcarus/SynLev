@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV BEAR CONTRACT V 0.0.3
+//SYNLEV BULL CONTRACT V 0.0.3
 //////////////////////////
 
 //THIS IS STANDARD OPENZEPLIN ERC-20 CONTRACT WITH BURN/MINT RESTRICTED TO VAULT
@@ -67,9 +67,9 @@ contract bull is IERC20, Context, Owned {
 
   constructor() public {
     symbol = "BULL";
-    name = "3xBULL";
-    decimals = 8;
-    vault = ;
+    name = "3xBULLETH/USD";
+    decimals = 18;
+    vault = 0xc09d7B693c79F8BEF1bB6368197e735935f66DC2;
   }
 
   modifier onlyVault {
@@ -97,11 +97,10 @@ contract bull is IERC20, Context, Owned {
     token.transfer(msg.sender, amount);
   }
 
-  function mint(address account, uint256 amount) public onlyVault() {
+  function mint(address account, uint256 amount) public override onlyVault() {
     _mint(account, amount);
   }
-
-  function burn(address account, uint256 amount) public onlyVault() {
+  function burn(address account, uint256 amount) public override onlyVault() {
     _burn(account, amount);
   }
 
@@ -150,7 +149,7 @@ contract bull is IERC20, Context, Owned {
 
       _beforeTokenTransfer(address(0), account, amount);
 
-      _totalSupply = _totalSupply.add(amount);  using NameFilter for string;
+      _totalSupply = _totalSupply.add(amount);
       _balances[account] = _balances[account].add(amount);
       emit Transfer(address(0), account, amount);
   }

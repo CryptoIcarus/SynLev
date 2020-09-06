@@ -6,7 +6,7 @@ pragma solidity >= 0.6.4;
 
 
 interface vaultPriceAggregatorInterface {
-  function priceRequest(address vault, uint256 lastUpdated) external view returns(int256[] memory, uint256);
+  function priceRequest(address vault, uint256 lastUpdated) external view returns(uint256[] memory, uint256);
 }
 
 contract Context {
@@ -46,7 +46,7 @@ contract Owned {
   }
 }
 
-contract vaultPriceAggregatorProxy is Conext, Owned {
+contract vaultPriceAggregatorProxy is Context, Owned {
 
   vaultPriceAggregatorInterface public vaultPriceAggregator;
   address public vaultPriceAggregatorPropose;
@@ -56,14 +56,14 @@ contract vaultPriceAggregatorProxy is Conext, Owned {
   public
   view
   virtual
-  override
-  returns(int256[] memory, uint256) {
+  returns(uint256[] memory, uint256) {
 
-    (int256[] memory priceData, uint256 lastUpdated) =
-    vaultPriceAggregator.priceRequest(vault, lastUpdated)
+    (uint256[] memory priceData, uint256 roundID) =
+    vaultPriceAggregator.priceRequest(vault, lastUpdated);
 
-    return(priceData, lastUpdated);
+    return(priceData, roundID);
   }
+
 
 
 
@@ -71,9 +71,12 @@ contract vaultPriceAggregatorProxy is Conext, Owned {
   //Functions setting and updating vault price aggregator
   //1 day delay required to push update
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+  function setVaultPriceAggregator(address account) public onlyOwner() {
+    vaultPriceAggregator = vaultPriceAggregatorInterface(account);
+  }
 
-  function proposeVaultPriceAggregator(address vaultPriceAggregator) public onlyOwner() {
-    vaultPriceAggregatorPropose = vaultPriceAggregator;
+  function proposeVaultPriceAggregator(address account) public onlyOwner() {
+    vaultPriceAggregatorPropose = account;
     proposeTimestamp = block.timestamp;
   }
   function updateVaultAggregator() public {
