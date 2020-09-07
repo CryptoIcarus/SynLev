@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV BULL CONTRACT V 0.0.3
+//SYNLEV BEAR CONTRACT V 0.0.4
 //////////////////////////
 
 //THIS IS STANDARD OPENZEPLIN ERC-20 CONTRACT WITH BURN/MINT RESTRICTED TO VAULT
@@ -57,7 +57,7 @@ interface IERC20 {
   event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-contract bull is IERC20, Context, Owned {
+contract bear is IERC20, Context, Owned {
   using SafeMath for uint256;
 
   event Transfer(address indexed from, address indexed to, uint256 value);
@@ -66,8 +66,8 @@ contract bull is IERC20, Context, Owned {
   event bBailout(address account, string kind, bytes32 message);
 
   constructor() public {
-    symbol = "BULL";
-    name = "3xBULLETH/USD";
+    symbol = "BEAR";
+    name = "3xBEARETH/USD";
     decimals = 18;
     vault = 0xc09d7B693c79F8BEF1bB6368197e735935f66DC2;
   }

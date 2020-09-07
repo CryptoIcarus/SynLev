@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV PRICE AGGREGATOR PROXY CONTRACT V 0.0.3
+//SYNLEV PRICE AGGREGATOR PROXY CONTRACT V 0.0.4
 //////////////////////////
 
 pragma solidity >= 0.6.4;
