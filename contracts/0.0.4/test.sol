@@ -122,6 +122,47 @@ contract test {
     emit TokenSell(account, token, tokensToBurn, ethout, fees, penalty);
   }
 
+  function addLiquidity() public payable {
+    require(msg.value >= minBuy);
+    updatePrice();
+
+    (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens )
+    = getLiqAddTokens(msg.value);
+    uint256 sharePrice = getSharePrice();
+    uint256 resultingShares = msg.value.mul(10**18).div(sharePrice);
+
+    liqEquity[bull] = liqEquity[bull].add(bullEquity);
+    liqEquity[bear] = liqEquity[bear].add(bearEquity);
+    liqTokens[bull] = liqTokens[bull].add(bullTokens);
+    liqTokens[bear] = liqTokens[bear].add(bearTokens);
+    userShares[msg.sender] = userShares[msg.sender].add(resultingShares);
+    totalLiqShares = totalLiqShares.add(resultingShares);
+
+    emit LiquidityAdd(msg.sender, msg.value, resultingShares, sharePrice);
+  }
+
+  function removeLiquidity(uint256 shares) public {
+    require(shares <= userShares[msg.sender]);
+    updatePrice();
+
+    (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens, uint256 feesPaid)
+    = getLiqRemoveTokens(shares);
+    uint256 sharePrice = getSharePrice();
+    uint256 resultingEth = bullEquity.add(bearEquity).add(feesPaid);
+
+    liqEquity[bull] = liqEquity[bull].sub(bullEquity);
+    liqEquity[bear] = liqEquity[bear].sub(bearEquity);
+    liqTokens[bull] = liqTokens[bull].sub(bullTokens);
+    liqTokens[bear] = liqTokens[bear].sub(bearTokens);
+    userShares[msg.sender] = userShares[msg.sender].sub(shares);
+    totalLiqShares = totalLiqShares.sub(shares);
+    liqFees = liqFees.sub(feesPaid);
+
+    msg.sender.transfer(resultingEth);
+
+    emit LiquidityRemove(msg.sender, resultingEth, shares, sharePrice);
+  }
+
 
 
 
@@ -262,7 +303,7 @@ contract test {
     returns(
       uint256 rbullEquity,
       uint256 rbearEquity,
-      uint256 rbullToknes,
+      uint256 rbullTokens,
       uint256 rbearTokens
     ) {
     uint256 bullEquity = liqEquity[bull] < liqEquity[bear] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
@@ -289,15 +330,20 @@ contract test {
       bearEquity.mul(10**18).div(price[bear])
     );
   }
-  function getLiqRemoveTokens(uint256 eth)
+  function getLiqRemoveTokens(uint256 shares)
     public
     view
     returns(
       uint256 rbullEquity,
       uint256 rbearEquity,
       uint256 rbullToknes,
-      uint256 rbearTokens
+      uint256 rbearTokens,
+      uint256 rfeesPaid
     ) {
+
+    uint256 eth = liqEquity[bull].add(liqEquity[bear]).mul(10**18).div(totalLiqShares);
+    eth = shares.mul(eth).div(10**18);
+
     uint256 bullEquity = liqEquity[bull] > liqEquity[bear] ? liqEquity[bull].sub(liqEquity[bear]) : 0 ;
     uint256 bearEquity = liqEquity[bear] > liqEquity[bull] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
 
@@ -319,11 +365,17 @@ contract test {
     uint256 bearTokens = bearEquity.mul(10**18).div(price[bear]);
     bullTokens = bullTokens > liqTokens[bull] ? liqTokens[bull] : bullTokens;
     bearTokens = bearTokens > liqTokens[bear] ? liqTokens[bear] : bearTokens;
+
+    uint256 feesPaid = liqFees.mul(shares).mul(10**18);
+    feesPaid = feesPaid.div(totalLiqShares).div(10**18);
+    feesPaid = shares <= totalLiqShares ? feesPaid : liqFees;
+
       return(
         bullEquity,
         bearEquity,
         bullTokens,
-        bearTokens
+        bearTokens,
+        feesPaid
       );
   }
 

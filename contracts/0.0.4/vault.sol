@@ -183,50 +183,45 @@ contract vault is Context, Owned {
     emit TokenSell(account, token, tokensToBurn, ethout, fees, penalty);
   }
 
-  function liquidityAdd(address account) public payable {
-    require(msg.value > 0);
-    uint256 eth = msg.value;
+  function addLiquidity() public payable {
+    require(msg.value >= minBuy);
+    updatePrice();
+
+    (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens )
+    = getLiqAddTokens(msg.value);
     uint256 sharePrice = getSharePrice();
-    uint256 newShares = eth.mul(10**18).div(sharePrice); //Maybe need to mod to avoid < 0 edge case
-    (
-      uint256 bullEquity,
-      uint256 bearEquity,
-      uint256 bullTokens,
-      uint256 bearTokens
-    ) = getLiqAddTokens(eth);
-    if(bullEquity != 0) {
-      liqEquity[bull] = liqEquity[bull].add(bullEquity);
-      liqTokens[bull] = liqTokens[bull].add(bullTokens);
-    }
-    if(bearEquity != 0) {
-      liqEquity[bear] = liqEquity[bear].add(bearEquity);
-      liqTokens[bear] = liqTokens[bear].add(bearTokens);
-    }
-    userShares[account] = userShares[account].add(newShares);
-    emit LiquidityAdd(account, eth, newShares, sharePrice);
+    uint256 resultingShares = msg.value.mul(10**18).div(sharePrice);
+
+    liqEquity[bull] = liqEquity[bull].add(bullEquity);
+    liqEquity[bear] = liqEquity[bear].add(bearEquity);
+    liqTokens[bull] = liqTokens[bull].add(bullTokens);
+    liqTokens[bear] = liqTokens[bear].add(bearTokens);
+    userShares[msg.sender] = userShares[msg.sender].add(resultingShares);
+    totalLiqShares = totalLiqShares.add(resultingShares);
+
+    emit LiquidityAdd(msg.sender, msg.value, resultingShares, sharePrice);
   }
 
-  function liquidityRemove(uint256 amount) public {
-    require(amount > 0);
-    require(userShares[msg.sender] <= amount);
+  function removeLiquidity(uint256 shares) public {
+    require(shares <= userShares[msg.sender]);
+    updatePrice();
+
+    (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens, uint256 feesPaid)
+    = getLiqRemoveTokens(shares);
     uint256 sharePrice = getSharePrice();
-    uint256 eth = sharePrice.mul(amount).div(10**18);
-    (
-      uint256 bullEquity,
-      uint256 bearEquity,
-      uint256 bullTokens,
-      uint256 bearTokens
-    ) = getLiqRemoveTokens(eth);
-    if(bullEquity != 0) {
-      liqEquity[bull] = liqEquity[bull].sub(bullEquity);
-      liqTokens[bull] = liqTokens[bull].sub(bullTokens);
-    }
-    if(bearEquity != 0) {
-      liqEquity[bear] = liqEquity[bear].sub(bearEquity);
-      liqTokens[bear] = liqTokens[bear].sub(bearTokens);
-    }
-    userShares[msg.sender] = userShares[msg.sender].sub(amount);
-    emit LiquidityRemove(msg.sender, eth, amount, sharePrice);
+    uint256 resultingEth = bullEquity.add(bearEquity).add(feesPaid);
+
+    liqEquity[bull] = liqEquity[bull].sub(bullEquity);
+    liqEquity[bear] = liqEquity[bear].sub(bearEquity);
+    liqTokens[bull] = liqTokens[bull].sub(bullTokens);
+    liqTokens[bear] = liqTokens[bear].sub(bearTokens);
+    userShares[msg.sender] = userShares[msg.sender].sub(shares);
+    totalLiqShares = totalLiqShares.sub(shares);
+    liqFees = liqFees.sub(feesPaid);
+
+    msg.sender.transfer(resultingEth);
+
+    emit LiquidityRemove(msg.sender, resultingEth, shares, sharePrice);
   }
 
 
@@ -372,19 +367,14 @@ contract vault is Context, Owned {
       return(liqEquity[bull].add(liqEquity[bear]).add(liqFees).mul(10**18).div(totalLiqShares));
     }
   }
-  //PROBABLY WILL NOT USE
-  function getEqualTokens(uint256 eth) public view returns(uint256, uint256) {
-    uint256 bulltkns = eth.div(2).mul(price[bull]).div(10**18);
-    uint256 beartkns = eth.sub(eth.div(2)).mul(price[bull]).div(10**18);
-    return(bulltkns, beartkns);
-  }
+
   function getLiqAddTokens(uint256 eth)
     public
     view
     returns(
       uint256 rbullEquity,
       uint256 rbearEquity,
-      uint256 rbullToknes,
+      uint256 rbullTokens,
       uint256 rbearTokens
     ) {
     uint256 bullEquity = liqEquity[bull] < liqEquity[bear] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
@@ -411,15 +401,20 @@ contract vault is Context, Owned {
       bearEquity.mul(10**18).div(price[bear])
     );
   }
-  function getLiqRemoveTokens(uint256 eth)
+  function getLiqRemoveTokens(uint256 shares)
     public
     view
     returns(
       uint256 rbullEquity,
       uint256 rbearEquity,
       uint256 rbullToknes,
-      uint256 rbearTokens
+      uint256 rbearTokens,
+      uint256 rfeesPaid
     ) {
+
+    uint256 eth = liqEquity[bull].add(liqEquity[bear]).mul(10**18).div(totalLiqShares);
+    eth = shares.mul(eth).div(10**18);
+
     uint256 bullEquity = liqEquity[bull] > liqEquity[bear] ? liqEquity[bull].sub(liqEquity[bear]) : 0 ;
     uint256 bearEquity = liqEquity[bear] > liqEquity[bull] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
 
@@ -441,13 +436,20 @@ contract vault is Context, Owned {
     uint256 bearTokens = bearEquity.mul(10**18).div(price[bear]);
     bullTokens = bullTokens > liqTokens[bull] ? liqTokens[bull] : bullTokens;
     bearTokens = bearTokens > liqTokens[bear] ? liqTokens[bear] : bearTokens;
+
+    uint256 feesPaid = liqFees.mul(shares).mul(10**18);
+    feesPaid = feesPaid.div(totalLiqShares).div(10**18);
+    feesPaid = shares <= totalLiqShares ? feesPaid : liqFees;
+
       return(
         bullEquity,
         bearEquity,
         bullTokens,
-        bearTokens
+        bearTokens,
+        feesPaid
       );
   }
+
 
   function getLatestRoundId() public view returns(uint256) {
     return(latestRoundId);
