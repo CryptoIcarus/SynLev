@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV PRICE AGGREGATOR CONTRACT V 0.0.4
+//SYNLEV PRICE AGGREGATOR CONTRACT V 0.1.0
 //////////////////////////
 
 pragma solidity >= 0.6.4;
@@ -53,7 +53,7 @@ interface AggregatorInterface {
 }
 
 
-contract price_oracle_integrator is Context, Owned {
+contract vaultPriceAggregator is Context, Owned {
 
   constructor() public {
 
@@ -68,6 +68,8 @@ contract price_oracle_integrator is Context, Owned {
 
   mapping(address => vaultStruct) public refVault;     //Vault address => vaultStruct
 
+  uint256 public maxUpdates = 10;
+
 
   function priceRequest(address vault, uint256 lastUpdated)
   public
@@ -75,12 +77,13 @@ contract price_oracle_integrator is Context, Owned {
   returns(uint256[] memory, uint256)
   {
     uint256 currentRound = refVault[vault].ref.latestRound();
-    uint256[] memory pricearray;
+    uint256 pricearrayLength = 1 + currentRound - lastUpdated;
     if(currentRound > lastUpdated) {
-      uint256 pricearrayLength = 1 + currentRound - lastUpdated;
-      pricearray = new uint256[] (pricearrayLength);
-      for(uint i = 0; i < pricearrayLength; i++) {
-        pricearray[i] = uint256(refVault[vault].ref.getAnswer(lastUpdated + i));
+      pricearrayLength = pricearrayLength > maxUpdates ? maxUpdates : pricearrayLength;
+      uint256[] memory pricearray = new uint256[] (pricearrayLength);
+      pricearray[0] =  uint256(refVault[vault].ref.getAnswer(lastUpdated));
+      for(uint i = 1; i < pricearrayLength; i++) {
+        pricearray[pricearrayLength - i] = uint256(refVault[vault].ref.getAnswer(1 + currentRound - i));
       }
       return(pricearray, currentRound);
     }
@@ -90,6 +93,10 @@ contract price_oracle_integrator is Context, Owned {
   }
 
 
+  function setMaxUpdates(uint256 amount) public onlyOwner() {
+    require(amount > 1);
+    maxUpdates = amount;
+  }
 
 
 
@@ -108,7 +115,7 @@ contract price_oracle_integrator is Context, Owned {
     refVault[vault].proposeTimestamp = block.timestamp;
   }
   function updateVaultAggregator(address vault) public {
-    if(refVault[vault].refPropose != address(0) && refVault[vault].proposeTimestamp + 1 days <= block.timestamp) {
+    if(refVault[vault].refPropose != address(0) && refVault[vault].proposeTimestamp + 7 days <= block.timestamp) {
       refVault[msg.sender].ref = AggregatorInterface(refVault[vault].refPropose);
       refVault[vault].refPropose = address(0);
     }

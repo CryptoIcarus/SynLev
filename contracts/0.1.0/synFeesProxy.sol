@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV ROUTER CONTRACT V 0.0.4
+//SYNLEV FEES PROXY CONTRACT V 0.1.0
 //////////////////////////
 
 pragma solidity >= 0.6.4;
@@ -41,7 +41,19 @@ contract Owned {
   }
 }
 
+contract synFeeProxy is Context, Owned {
 
-contract vaultRouter is Context, Owned {
+  address payable public feeRecipient;
 
+  receive() external payable {}
+
+
+  function forwardfees() public {
+      feeRecipient.transfer(address(this).balance);
+  }
+
+
+  function setFeeRecipient(address payable account) public onlyOwner() {
+    feeRecipient = account;
+  }
 }

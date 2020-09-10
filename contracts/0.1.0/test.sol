@@ -69,11 +69,11 @@ contract test {
   constructor() public {
     price[bull] = 10**16;
     price[bear] = 10**16;
-    supply[bull] = 1000 * 10**18;
-    supply[bear] = 1000 * 10**18;
+    supply[bull] = 0;
+    supply[bear] = 0;
 
-    equity[bull] = price[bull] * supply[bull] / 10**18;
-    equity[bear] = price[bear] * supply[bear] / 10**18;
+    equity[bull] = 0;
+    equity[bear] = 0;
   }
 
   //TEST data
@@ -184,53 +184,47 @@ contract test {
     uint256 bearEquity = getTokenEquity(bear);
     uint256 totalEquity = getTotalEquity();
     uint256 movement;
-
     uint256 bearKFactor;
     uint256 bullKFactor;
-
     uint256 pricedelta;
 
-    for (uint i = 1; i < priceData.length; i++) {
-      bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
-      bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
-      //BEARISH MOVEMENT, CALC BULL DATA
-      if(priceData[i-1] != priceData[i]) {
-        if(priceData[i-1] > priceData[i]) {
-          pricedelta = priceData[i-1].sub(priceData[i]);
-          pricedelta = pricedelta.mul(10**9).div(priceData[i-1]);
-          pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
-          pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
-          movement = bullEquity.mul(pricedelta).div(10**9);
-          bearEquity = bearEquity.add(movement);
-          bullEquity = totalEquity.sub(bearEquity);
-        }
-        //BULLISH MOVEMENT
-        else if(priceData[i-1] < priceData[i]) {
-          pricedelta = priceData[i].sub(priceData[i-1]);
-          pricedelta = pricedelta.mul(10**9).div(priceData[i-1]);
-          pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
-          pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
-          movement = bearEquity.mul(pricedelta).div(10**9);
-          bullEquity = bullEquity.add(movement);
-          bearEquity = totalEquity.sub(bullEquity);
+    if(bullEquity != 0 || bearEquity != 0) {
+      for (uint i = 1; i < priceData.length; i++) {
+        bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
+        bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
+        //BEARISH MOVEMENT, CALC BULL DATA
+        if(priceData[i-1] != priceData[i]) {
+          if(priceData[i-1] > priceData[i]) {
+            pricedelta = priceData[i-1].sub(priceData[i]);
+            pricedelta = pricedelta.mul(10**9).div(priceData[i-1]);
+            pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
+            pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+            movement = bullEquity.mul(pricedelta).div(10**9);
+            bearEquity = bearEquity.add(movement);
+            bullEquity = totalEquity.sub(bearEquity);
+          }
+          //BULLISH MOVEMENT, CALC BEAR DATA
+          else if(priceData[i-1] < priceData[i]) {
+            pricedelta = priceData[i].sub(priceData[i-1]);
+            pricedelta = pricedelta.mul(10**9).div(priceData[i-1]);
+            pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
+            pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+            movement = bearEquity.mul(pricedelta).div(10**9);
+            bullEquity = bullEquity.add(movement);
+            bearEquity = totalEquity.sub(bullEquity);
+          }
         }
       }
+      if(bullEquity != getTokenEquity(bull) || bearEquity != getTokenEquity(bear)) {
+        price[bull] = bullEquity.mul(10**18).div(supply[bull].add(liqTokens[bull]));
+        price[bear] = bearEquity.mul(10**18).div(supply[bear].add(liqTokens[bear]));
+        liqEquity[bull] = price[bull].mul(liqTokens[bull]).div(10**18);
+        liqEquity[bear] = price[bear].mul(liqTokens[bear]).div(10**18);
+        equity[bull] = bullEquity.sub(liqEquity[bull]);
+        equity[bear] = bearEquity.sub(liqEquity[bear]);
+      }
     }
-    if(bullEquity != getTokenEquity(bull) || bearEquity != getTokenEquity(bear)) {
-
-      price[bull] = bullEquity.mul(10**18).div(supply[bull].add(liqTokens[bull]));
-      price[bear] = bearEquity.mul(10**18).div(supply[bear].add(liqTokens[bear]));
-
-      liqEquity[bull] = price[bull].mul(liqTokens[bull]).div(10**18);
-      liqEquity[bear] = price[bear].mul(liqTokens[bear]).div(10**18);
-
-      equity[bull] = bullEquity.sub(liqEquity[bull]);
-      equity[bear] = bearEquity.sub(liqEquity[bear]);
-
-    }
-
     latestRoundId = roundId;
-
     emit PriceUpdate(latestRoundId, price[bull], price[bear]);
   }
 
@@ -298,14 +292,14 @@ contract test {
   }
 
   function getLiqAddTokens(uint256 eth)
-    public
-    view
-    returns(
-      uint256 rbullEquity,
-      uint256 rbearEquity,
-      uint256 rbullTokens,
-      uint256 rbearTokens
-    ) {
+  public
+  view
+  returns(
+    uint256 rbullEquity,
+    uint256 rbearEquity,
+    uint256 rbullTokens,
+    uint256 rbearTokens
+  ) {
     uint256 bullEquity = liqEquity[bull] < liqEquity[bear] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
     uint256 bearEquity = liqEquity[bear] < liqEquity[bull] ? liqEquity[bull].sub(liqEquity[bear]) : 0 ;
 
@@ -331,15 +325,15 @@ contract test {
     );
   }
   function getLiqRemoveTokens(uint256 shares)
-    public
-    view
-    returns(
-      uint256 rbullEquity,
-      uint256 rbearEquity,
-      uint256 rbullToknes,
-      uint256 rbearTokens,
-      uint256 rfeesPaid
-    ) {
+  public
+  view
+  returns(
+    uint256 rbullEquity,
+    uint256 rbearEquity,
+    uint256 rbullToknes,
+    uint256 rbearTokens,
+    uint256 rfeesPaid
+  ) {
 
     uint256 eth = liqEquity[bull].add(liqEquity[bear]).mul(10**18).div(totalLiqShares);
     eth = shares.mul(eth).div(10**18);
@@ -370,13 +364,13 @@ contract test {
     feesPaid = feesPaid.div(totalLiqShares).div(10**18);
     feesPaid = shares <= totalLiqShares ? feesPaid : liqFees;
 
-      return(
-        bullEquity,
-        bearEquity,
-        bullTokens,
-        bearTokens,
-        feesPaid
-      );
+    return(
+      bullEquity,
+      bearEquity,
+      bullTokens,
+      bearTokens,
+      feesPaid
+    );
   }
 
 

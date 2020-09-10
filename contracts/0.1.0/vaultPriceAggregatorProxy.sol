@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV PRICE AGGREGATOR PROXY CONTRACT V 0.0.4
+//SYNLEV PRICE AGGREGATOR PROXY CONTRACT V 0.1.0
 //////////////////////////
 
 pragma solidity >= 0.6.4;
@@ -71,6 +71,11 @@ contract vaultPriceAggregatorProxy is Context, Owned {
   //Functions setting and updating vault price aggregator
   //1 day delay required to push update
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+
+  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  //FOR TESTING ONLY. REMOVE ON PRODUCTION
+  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   function setVaultPriceAggregator(address account) public onlyOwner() {
     vaultPriceAggregator = vaultPriceAggregatorInterface(account);
   }

@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV FEES PROXY CONTRACT V 0.0.4
+//SYNLEV ROUTER CONTRACT V 0.1.0
 //////////////////////////
 
 pragma solidity >= 0.6.4;
@@ -41,16 +41,35 @@ contract Owned {
   }
 }
 
-contract synFeeProxy is Context, Owned {
 
-  address payable public feeRecipient;
+contract vaultRouter is Context, Owned {
 
-  function() external payable {
-    feeRecipient.transfer(address(this).balance);
+
+
+  function buyExactEthBullTokens(address vault, uint256 amount, uint256 deadline) public {
+    //TODO
+  }
+  function buyExactBullTokens(address vault, uint256 amount, uint256 deadline) public {
+    //TODO
+  }
+  function sellBullTokens(address vault, uint256 amount, uint256 deadline) public {
+    //TODO
+  }
+  function buyExactEthBearTokens(address vault, uint256 amount, uint256 deadline) public {
+    //TODO
+  }
+  function buyExactBearTokens(address vault, uint256 amount, uint256 deadline) public {
+    //TODO
+  }
+  function sellBearTokens(address vault, uint256 amount, uint256 deadline) public {
+    //TODO
   }
 
 
-  function setFeeRecipient(address account) public onlyOwner() {
-    feeRecipient = account;
-  }
+
+
+
+
+
+
 }
