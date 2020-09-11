@@ -4,74 +4,23 @@
 
 pragma solidity >= 0.6.4;
 
+import './ownable.sol';
+import './SafeMath.sol';
+import './IERC20.sol';
+
 interface vaultPriceAggregatorInterface {
   function priceRequest(address vault, uint256 lastUpdated) external view returns(uint256[] memory, uint256);
-}
-interface synFeesProxyInterface {
-  function feesToStaking(uint256 amount) external;
 }
 interface priceAggregator {
   function registerVaultAggregator(address aggregator) external;
 }
 
-interface IERC20 {
-  function totalSupply() external view returns (uint256);
-  function balanceOf(address account) external view returns (uint256);
-  function transfer(address recipient, uint256 amount) external returns (bool);
-  function allowance(address owner, address spender) external view returns (uint256);
-  function approve(address spender, uint256 amount) external returns (bool);
-  function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-  function mint(address account, uint256 amount) external;
-  function burn(uint256 amount) external;
-  event Transfer(address indexed from, address indexed to, uint256 value);
-  event Approval(address indexed owner, address indexed spender, uint256 value);
-}
 
-contract Context {
-  constructor () internal { }
-  function _msgSender() internal view virtual returns (address payable) {
-    return msg.sender;
-  }
-  function _msgData() internal view virtual returns (bytes memory) {
-    this;
-    return msg.data;
-  }
-}
-
-contract Owned {
-  address public owner;
-  address public newOwner;
-
-  event OwnershipTransferred(address indexed _from, address indexed _to);
-
-  constructor() public {
-    owner = msg.sender;
-  }
-
-  modifier onlyOwner {
-    require(msg.sender == owner);
-    _;
-  }
-
-  function transferOwnership(address _newOwner) public onlyOwner {
-    newOwner = _newOwner;
-  }
-  function acceptOwnership() public {
-    require(msg.sender == newOwner);
-    emit OwnershipTransferred(owner, newOwner);
-    owner = newOwner;
-    newOwner = address(0);
-  }
-}
-
-
-contract vault is Context, Owned {
+contract vault is Owned {
   using SafeMath for uint256;
   constructor() public {
-    priceAggregator(0xe03d6826700eDA5725542bF25C7fECE3613FC7e8).registerVaultAggregator(0x30B5068156688f818cEa0874B580206dFe081a03);
+    priceAggregator(0xb77661812060Ae26Da140DfB1668E709A3D23AC1).registerVaultAggregator(0x30B5068156688f818cEa0874B580206dFe081a03);
 
-    price[bull] = 10**16;
-    price[bear] = 10**16;
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
     balanceControlFactor = 10**9;
@@ -79,8 +28,6 @@ contract vault is Context, Owned {
     sellFee = 4 * 10**6;
 
     ( , latestRoundId) = priceProxy.priceRequest(address(this), latestRoundId);
-
-
 
     active = true;
 
@@ -128,14 +75,13 @@ contract vault is Context, Owned {
   bool public active;
 
   //token and proxy interfaces
-  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(0x47a7f888eC2aCC93cFC1C143d8DEcA0528a1660C);
+  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(0x872dD458F584B71f3A69827e3036779bEC40DCb8);
   address public bull;
   address public bear;
 
   //Leverage and price control variables
   uint256 constant public multiplier = 3;
   uint256 public lossLimit;
-  uint256 public minBuy;
   uint256 public kControl;
   uint256 public balanceEquity;
   uint256 public balanceControlFactor;
@@ -144,7 +90,7 @@ contract vault is Context, Owned {
   //FEES TAKEN AS A PRECENTAGE SCALED 10^9
   uint256 public buyFee;
   uint256 public sellFee;
-  address payable constant public feeRecipientProxy = 0x493e82758aD02ab90a0382021240fAEc374E9d83;
+  address payable constant public feeRecipientProxy = 0xA2441a8904b9eAaAbF9dd59A82caDc04825147DF;
 
   //Liquidity data
   uint256 public totalLiqShares;
@@ -170,15 +116,15 @@ contract vault is Context, Owned {
 
   receive() external payable {}
 
-  function tokenBuy(address token, address account) public  {
+  function tokenBuy(address token, address account) public virtual  {
     uint256 ethin = getDepositEquity();
-    require(ethin >= minBuy);
+    require(ethin > 0);
     require(token == bull || token == bear);
     updatePrice();
 
     IERC20 itkn = IERC20(token);
     uint256 fees = ethin.mul(buyFee).div(10**9);
-    uint256 buyeth = ethin - fees;
+    uint256 buyeth = ethin.sub(fees);
     uint256 bonus = getBonus(token, buyeth);
     uint256 tokensToMint = buyeth.add(bonus).mul(10**18).div(price[token]);
 
@@ -189,7 +135,7 @@ contract vault is Context, Owned {
     emit TokenBuy(account, token, tokensToMint, ethin, fees, bonus);
   }
 
-  function tokenSell(address token, address payable account) public {
+  function tokenSell(address token, address payable account) public virtual {
     IERC20 itkn = IERC20(token);
     uint256 tokensToBurn = itkn.balanceOf(address(this));
     require(tokensToBurn > 0);
@@ -209,26 +155,27 @@ contract vault is Context, Owned {
     emit TokenSell(account, token, tokensToBurn, ethout, fees, penalty);
   }
 
-  function addLiquidity() public payable {
-    require(msg.value >= minBuy);
+  function addLiquidity(address account) public payable virtual {
+    uint256 ethin = getDepositEquity();
+    require(ethin >= 0);
     updatePrice();
 
     (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens)
-    = getLiqAddTokens(msg.value);
+    = getLiqAddTokens(ethin);
     uint256 sharePrice = getSharePrice();
-    uint256 resultingShares = msg.value.mul(10**18).div(sharePrice);
+    uint256 resultingShares = ethin.mul(10**18).div(sharePrice);
 
     liqEquity[bull] = liqEquity[bull].add(bullEquity);
     liqEquity[bear] = liqEquity[bear].add(bearEquity);
     liqTokens[bull] = liqTokens[bull].add(bullTokens);
     liqTokens[bear] = liqTokens[bear].add(bearTokens);
-    userShares[msg.sender] = userShares[msg.sender].add(resultingShares);
+    userShares[account] = userShares[account].add(resultingShares);
     totalLiqShares = totalLiqShares.add(resultingShares);
 
-    emit LiquidityAdd(msg.sender, msg.value, resultingShares, sharePrice);
+    emit LiquidityAdd(account, ethin, resultingShares, sharePrice);
   }
 
-  function removeLiquidity(uint256 shares) public {
+  function removeLiquidity(uint256 shares) public virtual {
     require(shares <= userShares[msg.sender]);
     updatePrice();
 
@@ -250,10 +197,8 @@ contract vault is Context, Owned {
     emit LiquidityRemove(msg.sender, resultingEth, shares, sharePrice);
   }
 
-
-
   //PUBLIC PRICE UPDATE RETURNS A BOOL IF NO PRICE UPDATE NEEDED
-  function updatePrice() public isActive() returns(bool) {
+  function updatePrice() public virtual isActive() returns(bool) {
     uint256[] memory priceData;
     uint256 roundId;
     (priceData, roundId) = priceProxy.priceRequest(address(this), latestRoundId);
@@ -265,7 +210,6 @@ contract vault is Context, Owned {
       return(false);
     }
   }
-
 
   //LOW LEVEL PRICE UPDATE
   //TAKES RAW PRICE DATA
@@ -466,10 +410,24 @@ contract vault is Context, Owned {
     );
   }
 
-
-  function getLatestRoundId() public view returns(uint256) {
-    return(latestRoundId);
-  }
+  //FOR OTHER CONTRACTS TO CALL ANY NON CONSTANT VARIABLE OR MAPPING
+  function getBullToken() public view returns(address) {return(bull);}
+  function getBearToken() public view returns(address) {return(bear);}
+  function getMultiplier() public pure returns(uint256) {return(multiplier);}
+  function getLossLimit() public view returns(uint256) {return(lossLimit);}
+  function getkControl() public view returns(uint256) {return(kControl);}
+  function getBalanceEquity() public view returns(uint256) {return(balanceEquity);}
+  function getBalanceControlFactor() public view returns(uint256) {return(balanceControlFactor);}
+  function getBuyFee() public view returns(uint256) {return(buyFee);}
+  function getSellFee() public view returns(uint256) {return(sellFee);}
+  function getTotalLiqShares() public view returns(uint256) {return(totalLiqShares);}
+  function getLiqFees() public view returns(uint256) {return(liqFees);}
+  function getLiqTokens(address token) public view returns(uint256) {return(liqTokens[token]);}
+  function getLiqEquity(address token) public view returns(uint256) {return(liqEquity[token]);}
+  function getUserShares(address token) public view returns(uint256) {return(userShares[token]);}
+  function getLatestRoundId() public view returns(uint256) {return(latestRoundId);}
+  function getTokenPrice(address token) public view returns(uint256) {return(price[token]);}
+  function getEquity(address token) public view returns(uint256) {return(equity[token]);}
 
   function getTotalEquity() public view returns(uint256) {
     return(getTokenEquity(bear).add(getTokenEquity(bull)));
@@ -486,8 +444,8 @@ contract vault is Context, Owned {
     depositEquity = depositEquity.sub(liqFees.add(balanceEquity).add(getTotalEquity()));
     return(depositEquity);
   }
-  function getBullToken() public view returns(address) {return(bull);}
-  function getBearToken() public view returns(address) {return(bear);}
+
+
 
   ///////////////////
   //ADMIN FUNCTIONS//
@@ -503,6 +461,7 @@ contract vault is Context, Owned {
   function setTokens(address bearAddress, address bullAddress) public onlyOwner() {
     require(bear == address(0) || bull == address(0));
     (bull, bear) = (bullAddress, bearAddress);
+    (price[bull], price[bear]) = (10**16, 10**16);
   }
   function setActive(bool state) public onlyOwner() {
     active = state;
@@ -516,9 +475,6 @@ contract vault is Context, Owned {
     require(amount <= 10**7);
     sellFee = amount;
   }
-  function setMinBuy(uint256 amount) public onlyOwner() {
-    minBuy = amount;
-  }
   function setLossLimit(uint256 amount) public onlyOwner() {
     lossLimit = amount;
   }
@@ -530,51 +486,4 @@ contract vault is Context, Owned {
     balanceControlFactor = amount;
   }
 
-
-
-
-
-}
-
-library SafeMath {
-  function add(uint256 a, uint256 b) internal pure returns (uint256) {
-    uint256 c = a + b;
-    require(c >= a, "SafeMath: addition overflow");
-
-    return c;
-  }
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    return sub(a, b, "SafeMath: subtraction overflow");
-  }
-  function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-    require(b <= a, errorMessage);
-    uint256 c = a - b;
-
-    return c;
-  }
-  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-    if (a == 0) {
-      return 0;
-    }
-
-    uint256 c = a * b;
-    require(c / a == b, "SafeMath: multiplication overflow");
-
-    return c;
-  }
-  function div(uint256 a, uint256 b) internal pure returns (uint256) {
-    return div(a, b, "SafeMath: division by zero");
-  }
-  function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-    require(b > 0, errorMessage);
-    uint256 c = a / b;
-    return c;
-  }
-  function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-    return mod(a, b, "SafeMath: modulo by zero");
-  }
-  function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-    require(b != 0, errorMessage);
-    return a % b;
-  }
 }

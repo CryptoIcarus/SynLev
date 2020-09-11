@@ -4,42 +4,7 @@
 
 pragma solidity >= 0.6.4;
 
-contract Context {
-  constructor () internal { }
-  function _msgSender() internal view virtual returns (address payable) {
-    return msg.sender;
-  }
-  function _msgData() internal view virtual returns (bytes memory) {
-    this;
-    return msg.data;
-  }
-}
-
-contract Owned {
-  address public owner;
-  address public newOwner;
-
-  event OwnershipTransferred(address indexed _from, address indexed _to);
-
-  constructor() public {
-    owner = msg.sender;
-  }
-
-  modifier onlyOwner {
-    require(msg.sender == owner);
-    _;
-  }
-
-  function transferOwnership(address _newOwner) public onlyOwner {
-    newOwner = _newOwner;
-  }
-  function acceptOwnership() public {
-    require(msg.sender == newOwner);
-    emit OwnershipTransferred(owner, newOwner);
-    owner = newOwner;
-    newOwner = address(0);
-  }
-}
+import './ownable.sol';
 
 interface AggregatorInterface {
   function latestAnswer() external view returns (int256);
@@ -53,7 +18,7 @@ interface AggregatorInterface {
 }
 
 
-contract vaultPriceAggregator is Context, Owned {
+contract vaultPriceAggregator is Owned {
 
   constructor() public {
 
@@ -77,8 +42,8 @@ contract vaultPriceAggregator is Context, Owned {
   returns(uint256[] memory, uint256)
   {
     uint256 currentRound = refVault[vault].ref.latestRound();
-    uint256 pricearrayLength = 1 + currentRound - lastUpdated;
     if(currentRound > lastUpdated) {
+      uint256 pricearrayLength = 1 + currentRound - lastUpdated;
       pricearrayLength = pricearrayLength > maxUpdates ? maxUpdates : pricearrayLength;
       uint256[] memory pricearray = new uint256[] (pricearrayLength);
       pricearray[0] =  uint256(refVault[vault].ref.getAnswer(lastUpdated));
