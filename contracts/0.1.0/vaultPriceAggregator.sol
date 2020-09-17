@@ -74,13 +74,35 @@ contract vaultPriceAggregator is Owned {
 
     if(currentRound > lastUpdated) {
       uint256 pricearrayLength = 1 + currentRound - lastUpdated;
+      uint256 zeros = 0;
       pricearrayLength = pricearrayLength > maxUpdates ? maxUpdates : pricearrayLength;
       uint256[] memory pricearray = new uint256[] (pricearrayLength);
-      pricearray[0] =  uint256(refVault[vault].ref.getAnswer(lastUpdated));
-      for(uint i = 1; i < pricearrayLength; i++) {
-        pricearray[pricearrayLength - i] = uint256(refVault[vault].ref.getAnswer(1 + currentRound - i));
+      for(uint i = 0; i < pricearrayLength; i++) {
+        int price = refVault[vault].ref.getAnswer(lastUpdated + i);
+        if(price > 0){
+          pricearray[i] = uint256(price);
+        }
+        else {
+          zeros = zeros + 1;
+        }
       }
-      return(pricearray, currentRound);
+
+      if(zeros > 0) {
+        uint256[] memory newpricearray = new uint256[] (pricearrayLength - zeros);
+        uint256 count = 0;
+        for(uint i = 0; i < pricearrayLength; i++) {
+          if(pricearray[i] > 0) {
+            newpricearray[count] = pricearray[i];
+            count += 1;
+          }
+        }
+        return(newpricearray, currentRound);
+      }
+      else {
+        return(pricearray, currentRound);
+      }
+
+
     }
     else {
       return(new uint256[](0), lastUpdated);
@@ -101,6 +123,10 @@ contract vaultPriceAggregator is Owned {
   //to chainlink aggregator contract connections
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+
+  function testregister(address aggregator, address vault) public onlyOwner() {
+    refVault[vault].ref = AggregatorInterface(aggregator);
+  }
   //Can only be called by vault proxy, initiates pair
   function registerVaultAggregator(address aggregator) public {
     refVault[msg.sender].ref = AggregatorInterface(aggregator);
