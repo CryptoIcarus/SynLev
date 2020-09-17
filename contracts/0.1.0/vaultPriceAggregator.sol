@@ -69,7 +69,7 @@ contract vaultPriceAggregator is Owned {
       currentRound = 18446744073709552369;
     }
     else {
-      currentRound = lastUpdated + block.timestamp % 5
+      currentRound = lastUpdated + block.timestamp % 5;
     }
 
     if(currentRound > lastUpdated) {

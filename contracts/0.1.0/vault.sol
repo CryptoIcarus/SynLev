@@ -19,7 +19,7 @@ interface priceAggregator {
 contract vault is Owned {
   using SafeMath for uint256;
   constructor() public {
-    priceAggregator(0xb77661812060Ae26Da140DfB1668E709A3D23AC1).registerVaultAggregator(0x30B5068156688f818cEa0874B580206dFe081a03);
+    priceAggregator(0xdbE60B61af1fE77e4b6739bc0679660F92d3d18d).registerVaultAggregator(0x30B5068156688f818cEa0874B580206dFe081a03);
 
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
