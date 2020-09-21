@@ -36,7 +36,7 @@ contract vaultPriceAggregator is Owned {
   uint256 public maxUpdates = 10;
 
 
-  function priceRequestREAL(address vault, uint256 lastUpdated)
+  function priceRequestOLD(address vault, uint256 lastUpdated)
   public
   view
   returns(uint256[] memory, uint256)
@@ -64,14 +64,7 @@ contract vaultPriceAggregator is Owned {
   view
   returns(uint256[] memory, uint256)
   {
-    uint256 currentRound;
-    if(lastUpdated == 0) {
-      currentRound = 18446744073709552369;
-    }
-    else {
-      currentRound = lastUpdated + block.timestamp % 5;
-    }
-
+    uint256 currentRound = refVault[vault].ref.latestRound();
     if(currentRound > lastUpdated) {
       uint256 pricearrayLength = 1 + currentRound - lastUpdated;
       uint256 zeros = 0;
