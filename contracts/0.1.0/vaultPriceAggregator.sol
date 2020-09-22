@@ -35,30 +35,6 @@ contract vaultPriceAggregator is Owned {
 
   uint256 public maxUpdates = 10;
 
-
-  function priceRequestOLD(address vault, uint256 lastUpdated)
-  public
-  view
-  returns(uint256[] memory, uint256)
-  {
-    uint256 currentRound = refVault[vault].ref.latestRound();
-    if(currentRound > lastUpdated) {
-      uint256 pricearrayLength = 1 + currentRound - lastUpdated;
-      pricearrayLength = pricearrayLength > maxUpdates ? maxUpdates : pricearrayLength;
-      uint256[] memory pricearray = new uint256[] (pricearrayLength);
-      pricearray[0] =  uint256(refVault[vault].ref.getAnswer(lastUpdated));
-      for(uint i = 1; i < pricearrayLength; i++) {
-        pricearray[pricearrayLength - i] = uint256(refVault[vault].ref.getAnswer(1 + currentRound - i));
-      }
-      return(pricearray, currentRound);
-    }
-    else {
-      return(new uint256[](0), lastUpdated);
-    }
-  }
-
-  //FOR TESTING PURPOSES ONLY AS CHAINLINK HAS NOT BEEN ACTIVELY UPDATING ORACLE
-  //DATA WE GO BACK IN TIME
   function priceRequest(address vault, uint256 lastUpdated)
   public
   view
@@ -70,8 +46,8 @@ contract vaultPriceAggregator is Owned {
       uint256 zeros = 0;
       pricearrayLength = pricearrayLength > maxUpdates ? maxUpdates : pricearrayLength;
       uint256[] memory pricearray = new uint256[] (pricearrayLength);
-      for(uint i = 0; i < pricearrayLength; i++) {
-        int price = refVault[vault].ref.getAnswer(lastUpdated + i);
+      for(uint i = 1; i < pricearrayLength; i++) {
+        int price = refVault[vault].ref.getAnswer(1 + currentRound - i);
         if(price > 0){
           pricearray[i] = uint256(price);
         }
