@@ -230,8 +230,7 @@ contract vault is Owned {
         //BEARISH MOVEMENT, CALC BULL DATA
         if(priceData[i-1] != priceData[i]) {
           if(priceData[i-1] > priceData[i]) {
-            pricedelta = priceData[i-1].sub(priceData[i]);
-            pricedelta = pricedelta.mul(10**9).div(priceData[i-1]);
+            pricedelta = priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]);
             pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
             movement = bullEquity.mul(pricedelta).div(10**9);
@@ -240,8 +239,7 @@ contract vault is Owned {
           }
           //BULLISH MOVEMENT
           else if(priceData[i-1] < priceData[i]) {
-            pricedelta = priceData[i].sub(priceData[i-1]);
-            pricedelta = pricedelta.mul(10**9).div(priceData[i-1]);
+            pricedelta = priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1]);
             pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
             movement = bearEquity.mul(pricedelta).div(10**9);
@@ -291,16 +289,13 @@ contract vault is Owned {
 
   function getBonus(address token, uint256 eth) public view returns(uint256) {
     uint256 totaleth0 = getTotalEquity();
-    uint256 totaleth1 = totaleth0.add(eth);
     uint256 tokeneth0 = getTokenEquity(token);
-    uint256 tokeneth1 = tokeneth0.add(eth);
     uint256 kFactor = getKFactor(tokeneth0, getTokenEquity(bull), getTokenEquity(bear), totaleth0);
     bool t = kFactor == 0 ? tokeneth0 == 0 : true;
     if(t == true && balanceEquity > 0 && totaleth0 > tokeneth0 * 2) {
       uint256 ratio0 = tokeneth0.mul(10**18).div(totaleth0);
-      uint256 ratio1 = tokeneth1.mul(10**18).div(totaleth1);
-      uint256 bonus = ratio1 <= 5 * 10**17 ? ratio1.sub(ratio0).mul(10**18).div(5 * 10**17 - ratio0).mul(balanceEquity).div(10**18) : balanceEquity;
-      return(bonus);
+      uint256 ratio1 = tokeneth0.add(eth).mul(10**18).div(totaleth0.add(eth));
+      return(ratio1 <= 5 * 10**17 ? ratio1.sub(ratio0).mul(10**18).div(5 * 10**17 - ratio0).mul(balanceEquity).div(10**18) : balanceEquity);
     }
     else {
       return(0);
@@ -309,15 +304,12 @@ contract vault is Owned {
 
   function getPenalty(address token, uint256 eth) public view returns(uint256) {
     uint256 totaleth0 = getTotalEquity();
-    uint256 totaleth1 = totaleth0.sub(eth);
     uint256 tokeneth0 = getTokenEquity(token);
     uint256 tokeneth1 = tokeneth0.sub(eth);
     if(totaleth0.div(2) >= tokeneth1) {
       uint256 ratio0 = tokeneth0.mul(10**18).div(totaleth0);
-      uint256 ratio1 = tokeneth1.mul(10**18).div(totaleth1);
-      uint256 penalty = ratio0.sub(ratio1).div(2);
-      penalty = balanceControlFactor.mul(penalty).mul(eth).div(10**9).div(10**18);
-      return(penalty);
+      uint256 ratio1 = tokeneth1.mul(10**18).div(totaleth0.sub(eth));
+      return(balanceControlFactor.mul(ratio0.sub(ratio1).div(2)).mul(eth).div(10**9).div(10**18));
     }
     else {
       return(0);
@@ -375,8 +367,7 @@ contract vault is Owned {
     uint256 rbearTokens,
     uint256 rfeesPaid
   ) {
-    uint256 eth = liqEquity[bull].add(liqEquity[bear]).mul(10**18).div(totalLiqShares);
-    eth = shares.mul(eth).div(10**18);
+    uint256 eth = shares.mul(liqEquity[bull].add(liqEquity[bear]).mul(10**18).div(totalLiqShares)).div(10**18);
     uint256 bullEquity = liqEquity[bull] > liqEquity[bear] ? liqEquity[bull].sub(liqEquity[bear]) : 0 ;
     uint256 bearEquity = liqEquity[bear] > liqEquity[bull] ? liqEquity[bear].sub(liqEquity[bull]) : 0 ;
     if(bullEquity >= eth) bullEquity = eth;
@@ -440,9 +431,7 @@ contract vault is Owned {
     return(liqTokens[token].mul(price[token]).div(10**18));
   }
   function getDepositEquity() public view returns(uint256) {
-    uint256 depositEquity = address(this).balance;
-    depositEquity = depositEquity.sub(liqFees.add(balanceEquity).add(getTotalEquity()));
-    return(depositEquity);
+    return(address(this).balance.sub(liqFees.add(balanceEquity).add(getTotalEquity())));
   }
 
 
