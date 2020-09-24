@@ -7,7 +7,19 @@ import './IERC20.sol';
 contract SYNStakingCotract is Owned {
   using SafeMath for uint256;
 
-  IERC20 constant synToken = IERC20();
+  event OpenStake(
+    address account,
+    uint256 synIn,
+    uint256 resultingShares
+  );
+  event CloseStake(
+    address account,
+    uint256 resultingSyn,
+    uint256 resultingEth
+  );
+
+  //USING TESTNET LINK AS SYN TOKEN
+  IERC20 constant synToken = IERC20(0xa36085F69e2889c224210F603D836748e7dC0088);
 
   uint256 public totalShares;
   mapping(address => uint256) public userSYN;
@@ -15,41 +27,43 @@ contract SYNStakingCotract is Owned {
 
   receive() external payable {}
 
-  //UNTESTED
+
   function addStakingTokens(uint256 amount) public {
     uint256 sharePrice = getSharePrice();
     uint256 resultingShares = amount.mul(10**18).div(sharePrice);
-    require(transferFrom(msg.sender, address(this), amount));
+    require(synToken.transferFrom(msg.sender, address(this), amount));
     totalShares = totalShares.add(resultingShares);
     userShares[msg.sender] = userShares[msg.sender].add(resultingShares);
     userSYN[msg.sender] = userSYN[msg.sender].add(amount);
+    emit OpenStake(msg.sender, amount, resultingShares);
   }
-  //UNTESTED
+
   function removeStakingTokens() public {
     address payable account = msg.sender;
     require(userShares[account] > 0);
-    uint256 sharePrice = getSharePrice();
-    uint256 resultingValue = userShares[account].mul(sharePrice).div(10**18);
-    uint256 resultingEth = resultingValue.sub(userSYN[account]);
+    uint256 resultingEth = userShares[account].mul(getSharePrice()).div(10**18).sub(userSYN[account]);
+    uint256 resultingSyn = userSYN[msg.sender];
 
     totalShares = totalShares.sub(userShares[account]);
 
-    userSYN[account] = 0;
     userShares[account] = 0;
+    userSYN[account] = 0;
 
-    transfer.account(resultingEth);
-    synToken.transfer(account, userSYN[msg.sender]);
+    account.transfer(resultingEth);
+    synToken.transfer(account, resultingSyn);
+
+    emit CloseStake(msg.sender, resultingSyn, resultingEth);
   }
-  //UNTESTED
+
   function claimStakedEth() public {
     //TODO
   }
   function getSharePrice() public view returns(uint256) {
-    if(totalLiqShares == 0) {
-      return(address(this).balance);
+    if(totalShares == 0) {
+      return(10**18);
     }
     else {
-      return(address(this).balance.add(totalSYN).mul(10**18).div(totalShares));
+      return(address(this).balance.add(synToken.balanceOf(address(this))).mul(10**18).div(totalShares));
     }
   }
 
