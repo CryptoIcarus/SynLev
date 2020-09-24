@@ -12,11 +12,10 @@ contract synFeeProxy is Owned {
 
   receive() external payable {}
 
-
   function forwardfees() public {
-      feeRecipient.transfer(address(this).balance);
+    require(feeRecipient != address(0));
+    feeRecipient.transfer(address(this).balance);
   }
-
 
   function setFeeRecipient(address payable account) public onlyOwner() {
     feeRecipient = account;
