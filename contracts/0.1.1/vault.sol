@@ -2,7 +2,7 @@
 //SYNLEV VAULT CONTRACT V 0.1.0
 //////////////////////////
 
-pragma solidity >= 0.6.4;
+pragma solidity >= 0.6.6;
 
 import './ownable.sol';
 import './SafeMath.sol';
@@ -232,13 +232,8 @@ contract vault is Owned {
         bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
         //BEARISH MOVEMENT, CALC BULL DATA
         if(priceData[i-1] != 0 && priceData[i] != 0 && priceData[i-1] != priceData[i]) {
-
           if(priceData[i-1] > priceData[i]) {
-
-            pricdedelta = priceData
-
-
-            pricedelta = priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]);
+            pricedelta = uint256(priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]));
             pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
             movement = bullEquity.mul(pricedelta).div(10**9);
@@ -247,7 +242,7 @@ contract vault is Owned {
           }
           //BULLISH MOVEMENT
           else if(priceData[i-1] < priceData[i]) {
-            pricedelta = priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1]);
+            pricedelta = uint256(priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1]));
             pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
             movement = bearEquity.mul(pricedelta).div(10**9);
@@ -256,7 +251,7 @@ contract vault is Owned {
           }
         }
       }
-    }
+
 
     price[bull] = bullEquity.mul(10**18).div(IERC20(bull).totalSupply().add(liqTokens[bull]));
     price[bear] = bearEquity.mul(10**18).div(IERC20(bear).totalSupply().add(liqTokens[bear]));

@@ -2,7 +2,7 @@
 //SYNLEV PRICE AGGREGATOR CONTRACT V 0.1.0
 //////////////////////////
 
-pragma solidity >= 0.6.4;
+pragma solidity >= 0.6.6;
 
 import './ownable.sol';
 
