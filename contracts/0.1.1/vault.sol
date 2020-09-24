@@ -6,6 +6,7 @@ pragma solidity >= 0.6.4;
 
 import './ownable.sol';
 import './SafeMath.sol';
+import './SignedSafeMath.sol';
 import './IERC20.sol';
 
 interface vaultPriceAggregatorInterface {
@@ -18,6 +19,7 @@ interface priceAggregator {
 
 contract vault is Owned {
   using SafeMath for uint256;
+  using SignedSafeMath for int256;
   constructor() public {
     priceAggregator(0x47a7f888eC2aCC93cFC1C143d8DEcA0528a1660C).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
 
@@ -199,9 +201,10 @@ contract vault is Owned {
 
   //PUBLIC PRICE UPDATE RETURNS A BOOL IF NO PRICE UPDATE NEEDED
   function updatePrice() public virtual isActive() returns(bool) {
-    uint256[] memory priceData;
-    uint256 roundId;
-    (priceData, roundId) = priceProxy.priceRequest(address(this), latestRoundId);
+    (
+      int256[] memory priceData,
+      uint256 roundId
+    ) = priceProxy.priceRequest(address(this), latestRoundId);
     if(priceData.length >= 2) {
       _updatePrice(priceData, roundId);
       return(true);
@@ -215,7 +218,7 @@ contract vault is Owned {
   //TAKES RAW PRICE DATA
   //PUBLIC FUNCTIONS RUN SAFETY CHECKS
   //ORACLE IS RESPONSIBLE OF CHECKING THAT IT DOESN'T SEND TOO MUCH PRICE DATA TO CAUSE GAS TO BE TOO HIGH
-  function _updatePrice(uint256[] memory priceData, uint256 roundId) internal {
+  function _updatePrice(int256[] memory priceData, uint256 roundId) internal {
     uint256 bullEquity = getTokenEquity(bull);
     uint256 bearEquity = getTokenEquity(bear);
     uint256 totalEquity = getTotalEquity();
@@ -228,8 +231,13 @@ contract vault is Owned {
         bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
         bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
         //BEARISH MOVEMENT, CALC BULL DATA
-        if(priceData[i-1] != priceData[i]) {
+        if(priceData[i-1] != 0 && priceData[i] != 0 && priceData[i-1] != priceData[i]) {
+
           if(priceData[i-1] > priceData[i]) {
+
+            pricdedelta = priceData
+
+
             pricedelta = priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]);
             pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
@@ -248,6 +256,7 @@ contract vault is Owned {
           }
         }
       }
+    }
 
     price[bull] = bullEquity.mul(10**18).div(IERC20(bull).totalSupply().add(liqTokens[bull]));
     price[bear] = bearEquity.mul(10**18).div(IERC20(bear).totalSupply().add(liqTokens[bear]));
@@ -424,8 +433,8 @@ contract vault is Owned {
     return(getTokenEquity(bear).add(getTokenEquity(bull)));
   }
 
-  function getTokenEquity(address _token) public view returns(uint256) {
-    return(equity[_token].add(liqEquity[_token]));
+  function getTokenEquity(address token) public view returns(uint256) {
+    return(equity[token].add(liqEquity[token]));
   }
   function getTokenLiqEquity(address token) public view returns(uint256) {
     return(liqTokens[token].mul(price[token]).div(10**18));
