@@ -10,7 +10,7 @@ import './SignedSafeMath.sol';
 import './IERC20.sol';
 
 interface vaultPriceAggregatorInterface {
-  function priceRequest(address vault, uint256 lastUpdated) external view returns(uint256[] memory, uint256);
+  function priceRequest(address vault, uint256 lastUpdated) external view returns(int256[] memory, uint256);
 }
 interface priceAggregator {
   function registerVaultAggregator(address aggregator) external;
@@ -230,10 +230,13 @@ contract vault is Owned {
       for (uint i = 1; i < priceData.length; i++) {
         bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
         bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
-        //BEARISH MOVEMENT, CALC BULL DATA
-        if(priceData[i-1] != 0 && priceData[i] != 0 && priceData[i-1] != priceData[i]) {
+        if(priceData[i-1] != priceData[i]) {
+          //BEARISH MOVEMENT, CALC BULL DATA
           if(priceData[i-1] > priceData[i]) {
-            pricedelta = uint256(priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]));
+            if(priceData[i-1] == 0) priceData[i-1] = 1;
+            pricedelta = priceData[i-1] > 0 ?
+              uint256(priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1])) :
+              uint256(-priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]));
             pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
             movement = bullEquity.mul(pricedelta).div(10**9);
@@ -242,7 +245,10 @@ contract vault is Owned {
           }
           //BULLISH MOVEMENT
           else if(priceData[i-1] < priceData[i]) {
-            pricedelta = uint256(priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1]));
+            if(priceData[i] == 0) priceData[i] = 1;
+            pricedelta = priceData[i] > 0 ?
+              uint256(priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i])) :
+              uint256(-priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i]));
             pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
             movement = bearEquity.mul(pricedelta).div(10**9);
