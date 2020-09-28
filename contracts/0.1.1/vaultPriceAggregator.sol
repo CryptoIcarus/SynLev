@@ -31,7 +31,7 @@ contract vaultPriceAggregator is Owned {
 
   mapping(address => vaultStruct) public refVault;     //Vault address => vaultStruct
 
-  uint256 public maxUpdates = 20;
+  uint256 public maxUpdates = 50;
 
   function priceRequest(address vault, uint256 lastUpdated)
   public

@@ -7,7 +7,7 @@ pragma solidity >= 0.6.4;
 import './ownable.sol';
 
 interface vaultPriceAggregatorInterface {
-  function priceRequest(address vault, uint256 lastUpdated) external view returns(uint256[] memory, uint256);
+  function priceRequest(address vault, uint256 lastUpdated) external view returns(int256[] memory, uint256);
 }
 
 contract vaultPriceAggregatorProxy is Owned {
@@ -20,9 +20,9 @@ contract vaultPriceAggregatorProxy is Owned {
   public
   view
   virtual
-  returns(uint256[] memory, uint256) {
+  returns(int256[] memory, uint256) {
 
-    (uint256[] memory priceData, uint256 roundID) =
+    (int256[] memory priceData, uint256 roundID) =
     vaultPriceAggregator.priceRequest(vault, lastUpdated);
 
     return(priceData, roundID);

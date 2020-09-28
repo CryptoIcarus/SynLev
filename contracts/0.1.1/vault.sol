@@ -21,7 +21,7 @@ contract vault is Owned {
   using SafeMath for uint256;
   using SignedSafeMath for int256;
   constructor() public {
-    priceAggregator(0x47a7f888eC2aCC93cFC1C143d8DEcA0528a1660C).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
+    priceAggregator(0x74faB436e67e322E576fB9d37e653805F41a7E18).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
 
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
@@ -77,7 +77,7 @@ contract vault is Owned {
   bool public active;
 
   //token and proxy interfaces
-  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(0xe03d6826700eDA5725542bF25C7fECE3613FC7e8);
+  vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(0xE115662B3eD0D9db3af0b09C5859e405B36D1622);
   address public bull;
   address public bear;
 
@@ -92,7 +92,7 @@ contract vault is Owned {
   //FEES TAKEN AS A PRECENTAGE SCALED 10^9
   uint256 public buyFee;
   uint256 public sellFee;
-  address payable constant public feeRecipientProxy = 0x11B7dC08cb78920b88677BEe5D055407515EE516;
+  address payable constant public feeRecipientProxy = 0xb6C069e09dC272199280D3d25480241325d3F2dd;
 
   //Liquidity data
   uint256 public totalLiqShares;
