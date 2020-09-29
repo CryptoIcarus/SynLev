@@ -247,8 +247,8 @@ contract vault is Owned {
           else if(priceData[i-1] < priceData[i]) {
             if(priceData[i] == 0) priceData[i] = 1;
             pricedelta = priceData[i] > 0 ?
-              uint256(priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i])) :
-              uint256(-priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i]));
+              uint256(priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1])) :
+              uint256(-priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1]));
             pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
             pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
             movement = bearEquity.mul(pricedelta).div(10**9);
