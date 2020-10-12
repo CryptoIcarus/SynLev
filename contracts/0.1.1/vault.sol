@@ -36,9 +36,13 @@ contract vault is Owned {
   }
 
   event PriceUpdate(
-    uint256 roundId,
     uint256 bullPrice,
-    uint256 bearPrice
+    uint256 bearPrice,
+    uint256 bullLiqEquity,
+    uint256 bearLiqEquity,
+    uint256 bullEquity,
+    uint256 bearEquity,
+    uint256 roundId
   );
   event TokenBuy(
     address account,
@@ -100,7 +104,6 @@ contract vault is Owned {
   mapping(address => uint256) public liqTokens;
   mapping(address => uint256) public liqEquity;
   mapping(address => uint256) public userShares;
-
 
   //Pricing and equity data
   uint256 public latestRoundId;                     //Last round that we updated price
@@ -199,76 +202,54 @@ contract vault is Owned {
     emit LiquidityRemove(msg.sender, resultingEth, shares, sharePrice);
   }
 
-  //PUBLIC PRICE UPDATE RETURNS A BOOL IF NO PRICE UPDATE NEEDED
-  function updatePrice() public virtual isActive() returns(bool) {
+  //PUBLIC UPDATE PRICE FUNCTION
+  function updatePrice(
+  )
+  public
+  returns(bool)
+  {
     (
-      int256[] memory priceData,
+      uint256 bullPrice,
+      uint256 bearPrice,
+      uint256 bullLiqEquity,
+      uint256 bearLiqEquity,
+      uint256 bullEquity,
+      uint256 bearEquity,
       uint256 roundId
-    ) = priceProxy.priceRequest(address(this), latestRoundId);
-    if(priceData.length >= 2) {
-      _updatePrice(priceData, roundId);
+    ) = getUpdatedPrice();
+    if(roundId > latestRoundId) {
+      (
+        price[bull],
+        price[bear],
+        liqEquity[bull],
+        liqEquity[bear],
+        equity[bull],
+        equity[bear],
+        latestRoundId
+      ) =
+      (
+        bullPrice,
+        bearPrice,
+        bullLiqEquity,
+        bearLiqEquity,
+        bullEquity,
+        bearEquity,
+        roundId
+      );
+      emit PriceUpdate(
+        price[bull],
+        price[bear],
+        liqEquity[bull],
+        liqEquity[bear],
+        equity[bull],
+        equity[bear],
+        latestRoundId
+      );
       return(true);
     }
     else {
       return(false);
     }
-  }
-
-  //LOW LEVEL PRICE UPDATE
-  //TAKES RAW PRICE DATA
-  //PUBLIC FUNCTIONS RUN SAFETY CHECKS
-  //ORACLE IS RESPONSIBLE OF CHECKING THAT IT DOESN'T SEND TOO MUCH PRICE DATA TO CAUSE GAS TO BE TOO HIGH
-  function _updatePrice(int256[] memory priceData, uint256 roundId) internal {
-    uint256 bullEquity = getTokenEquity(bull);
-    uint256 bearEquity = getTokenEquity(bear);
-    uint256 totalEquity = getTotalEquity();
-    uint256 movement;
-    uint256 bearKFactor;
-    uint256 bullKFactor;
-    uint256 pricedelta;
-    if(bullEquity != 0 && bearEquity != 0) {
-      for (uint i = 1; i < priceData.length; i++) {
-        bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
-        bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
-        if(priceData[i-1] != priceData[i]) {
-          //BEARISH MOVEMENT, CALC BULL DATA
-          if(priceData[i-1] > priceData[i]) {
-            if(priceData[i-1] == 0) priceData[i-1] = 1;
-            pricedelta = priceData[i-1] > 0 ?
-              uint256(priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1])) :
-              uint256(-priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]));
-            pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
-            pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
-            movement = bullEquity.mul(pricedelta).div(10**9);
-            bearEquity = bearEquity.add(movement);
-            bullEquity = totalEquity.sub(bearEquity);
-          }
-          //BULLISH MOVEMENT
-          else if(priceData[i-1] < priceData[i]) {
-            if(priceData[i] == 0) priceData[i] = 1;
-            pricedelta = priceData[i] > 0 ?
-              uint256(priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1])) :
-              uint256(-priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1]));
-            pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
-            pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
-            movement = bearEquity.mul(pricedelta).div(10**9);
-            bullEquity = bullEquity.add(movement);
-            bearEquity = totalEquity.sub(bullEquity);
-          }
-        }
-      }
-
-
-    price[bull] = bullEquity.mul(10**18).div(IERC20(bull).totalSupply().add(liqTokens[bull]));
-    price[bear] = bearEquity.mul(10**18).div(IERC20(bear).totalSupply().add(liqTokens[bear]));
-    liqEquity[bull] = price[bull].mul(liqTokens[bull]).div(10**18);
-    liqEquity[bear] = price[bear].mul(liqTokens[bear]).div(10**18);
-    equity[bull] = bullEquity.sub(liqEquity[bull]);
-    equity[bear] = bearEquity.sub(liqEquity[bear]);
-
-    }
-    latestRoundId = roundId;
-    emit PriceUpdate(latestRoundId, price[bull], price[bear]);
   }
 
   function payFees(uint256 amount) internal {
@@ -281,6 +262,85 @@ contract vault is Owned {
   ///////////////////
   ///VIEW FUNCTIONS//
   ///////////////////
+  function getUpdatedPrice()
+  public
+  view
+  returns(
+    uint256 rBullPrice,
+    uint256 rBearPrice,
+    uint256 rBullLiqEquity,
+    uint256 rBearLiqEquity,
+    uint256 rBullEquity,
+    uint256 rBearEquity,
+    uint256 rRoundId
+  ) {
+    (
+      int256[] memory priceData,
+      uint256 roundId
+    ) = priceProxy.priceRequest(address(this), latestRoundId);
+    if(priceData.length >= 2) {
+      uint256 bullEquity = getTokenEquity(bull);
+      uint256 bearEquity = getTokenEquity(bear);
+      uint256 totalEquity = getTotalEquity();
+      uint256 movement;
+      uint256 bearKFactor;
+      uint256 bullKFactor;
+      uint256 pricedelta;
+      if(bullEquity != 0 && bearEquity != 0) {
+        for (uint i = 1; i < priceData.length; i++) {
+          bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
+          bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
+          if(priceData[i-1] != priceData[i]) {
+            //BEARISH MOVEMENT, CALC BULL DATA
+            if(priceData[i-1] > priceData[i]) {
+              if(priceData[i-1] == 0) priceData[i-1] = 1;
+              pricedelta = priceData[i-1] > 0 ?
+                uint256(priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1])) :
+                uint256(-priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]));
+              pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
+              pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+              movement = bullEquity.mul(pricedelta).div(10**9);
+              bearEquity = bearEquity.add(movement);
+              bullEquity = totalEquity.sub(bearEquity);
+            }
+            //BULLISH MOVEMENT
+            else if(priceData[i-1] < priceData[i]) {
+              if(priceData[i] == 0) priceData[i] = 1;
+              pricedelta = priceData[i] > 0 ?
+                uint256(priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1])) :
+                uint256(-priceData[i].sub(priceData[i-1]).mul(10**9).div(priceData[i-1]));
+              pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(10**9);
+              pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+              movement = bearEquity.mul(pricedelta).div(10**9);
+              bullEquity = bullEquity.add(movement);
+              bearEquity = totalEquity.sub(bullEquity);
+            }
+          }
+        }
+        return(
+          bullEquity.mul(10**18).div(IERC20(bull).totalSupply().add(liqTokens[bull])),
+          bearEquity.mul(10**18).div(IERC20(bear).totalSupply().add(liqTokens[bear])),
+          price[bull].mul(liqTokens[bull]).div(10**18),
+          price[bear].mul(liqTokens[bear]).div(10**18),
+          bullEquity.sub(liqEquity[bull]),
+          bearEquity.sub(liqEquity[bear]),
+          roundId
+        );
+      }
+    }
+    else {
+      return(
+        price[bull],
+        price[bear],
+        liqEquity[bull],
+        liqEquity[bear],
+        equity[bull],
+        equity[bear],
+        roundId
+      );
+    }
+  }
+
   //K FACTOR OF 1 (10^9) REPRESENTS A 1:1 RATIO OF BULL : BEAR EQUITY
   function getKFactor(uint256 targetEquity, uint256 bullEquity, uint256 bearEquity, uint256 totalEquity)
   public
@@ -451,12 +511,6 @@ contract vault is Owned {
   ///////////////////
   //ONE TIME USE FUNCTION TO SET TOKEN ADDRESSES. THIS CAN NEVER BE CHANGED ONCE SET.
   //Cannot be included in constructor as vault must be deployed before tokens.
-
-  //TESTING ONLY!!
-  function setRoundId(uint256 roundId) public onlyOwner() {
-    latestRoundId = roundId;
-  }
-
   function setTokens(address bearAddress, address bullAddress) public onlyOwner() {
     require(bear == address(0) || bull == address(0));
     (bull, bear) = (bullAddress, bearAddress);
