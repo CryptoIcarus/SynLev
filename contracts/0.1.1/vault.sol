@@ -257,8 +257,6 @@ contract vault is Owned {
     liqFees += amount.sub(amount.div(2));
   }
 
-
-
   ///////////////////
   ///VIEW FUNCTIONS//
   ///////////////////
