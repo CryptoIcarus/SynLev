@@ -67,8 +67,8 @@ contract unistake is Owned {
     totalSynRewards = 10**17;
   }
 
-  IERC20 public SYN = IERC20(0xFEca6d36f3d0f03348e1D0EfF8fB9B26CCD301Ba);
-  IERC20 public LPTKN = IERC20(0xa36085F69e2889c224210F603D836748e7dC0088);
+  IERC20 public SYN = IERC20(0x1695936d6a953df699C38CA21c2140d497C08BD9);
+  IERC20 public LPTKN = IERC20(0xdf27a38946a1ace50601ef4e10f07a9cc90d7231);
 
   uint256 public synPerLPTNKPerDay;
   uint256 public startTime;
