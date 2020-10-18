@@ -63,8 +63,8 @@ contract unistake is Owned {
   constructor() public {
     synPerLPTNKPerDay = 1 * 10**18;
     startTime = block.timestamp;
-    endTime =  block.timestamp.add(10 minutes);
-    totalSynRewards = 10**17;
+    endTime =  block.timestamp.add(30 days);
+    totalSynRewards = 2 * 10**6 * 10**18;
   }
 
   IERC20 public SYN = IERC20(0x1695936d6a953df699C38CA21c2140d497C08BD9);
