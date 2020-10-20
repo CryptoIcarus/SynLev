@@ -338,7 +338,7 @@ contract vault is Owned {
   //ON EQUITY.
   //IMPORTANT TO CALCULATE THE PRICE FROM UP/DOWN PERSPECTIVE AS ROUNDING
   //INACCURACY OVER TIME WILL ADD UP IF CALCUALTIONS ARE ALWAYS DONE FROM THE
-  //SAME PERSPECTIVE 
+  //SAME PERSPECTIVE
   function getUpdatedPrice()
   public
   view
@@ -440,30 +440,46 @@ contract vault is Owned {
     }
   }
 
+  //K FACTOR IS THE MULTIPLIER THAT ADJUSTS THE LEVERAGE LEVEL TO MAINTAIN 100%
+  //LIQUIDTY AT ALL TIMES.
   //K FACTOR OF 1 (10^9) REPRESENTS A 1:1 RATIO OF BULL : BEAR EQUITY
+  //TAKES TARGET EQUITY (THE K FACTOR OF THE TARGET TOKEN)
   function getKFactor(uint256 targetEquity, uint256 bullEquity, uint256 bearEquity, uint256 totalEquity)
   public
   view
   returns(uint256) {
+    //IF EITHER TOKEN HAS 0 EQUITY K VALUE IS 0
     if(bullEquity  == 0 || bearEquity == 0) {
       return(0);
     }
     else {
-      uint256 tokenEquity = targetEquity;
-      tokenEquity = tokenEquity > 0 ? tokenEquity : 1;
-      uint256 kFactor = totalEquity.mul(10**9).div(tokenEquity.mul(2)) < kControl ? totalEquity.mul(10**9).div(tokenEquity.mul(2)): kControl;
+      //AVOIDS DIVIDES BY 0 ERROR
+      //TODO CHECK IF NECCESARY TO DO THIS CHECK
+      targetEquity = targetEquity > 0 ? targetEquity : 1;
+      uint256 kFactor = totalEquity.mul(10**9).div(targetEquity.mul(2)) < kControl ? totalEquity.mul(10**9).div(targetEquity.mul(2)): kControl;
       return(kFactor);
     }
   }
 
+  //CALC BONUS BASED ON THE TARGET TOKEN AND THE AMOUNT OF ETH USED TO BUY
+  //ONLY USED FOR TOKEN BUYS, NEVER SELLS
   function getBonus(address token, uint256 eth) public view returns(uint256) {
+    //GRAB TOTAL EQUITY OF BOTH TOKENS
     uint256 totaleth0 = getTotalEquity();
+    //GRAB TOTAL EQUITY OF ONLY TARGET TOKEN
     uint256 tokeneth0 = getTokenEquity(token);
+    //GRAB TARGET TOKEN K FACTOR TO CHECK IF BONUS SHOULD CALC
+    //TODO CHANGE TO SIMPLER CHECK AS K FACTOR NO LONGER USED TO CALC BONUS
     uint256 kFactor = getKFactor(tokeneth0, getTokenEquity(bull), getTokenEquity(bear), totaleth0);
     bool t = kFactor == 0 ? tokeneth0 == 0 : true;
+    //CHECK IF WE NEED TO CALC A BONUS
     if(t == true && balanceEquity > 0 && totaleth0 > tokeneth0 * 2) {
+      //CURRENT RATIO OF TOKEN EQUITY TO TOTAL EQUITY
       uint256 ratio0 = tokeneth0.mul(10**18).div(totaleth0);
+      //RATIO OF TOKEN EQUITY TO TOTAL EQUITY AFTER BUY
       uint256 ratio1 = tokeneth0.add(eth).mul(10**18).div(totaleth0.add(eth));
+      //IF THE AFTER BUY RATIO IS GRATER THAN .5 (50%) WE REWARD THE ENTIRE
+      //BALANCE EQUITY
       return(ratio1 <= 5 * 10**17 ? ratio1.sub(ratio0).mul(10**18).div(5 * 10**17 - ratio0).mul(balanceEquity).div(10**18) : balanceEquity);
     }
     else {
@@ -471,12 +487,20 @@ contract vault is Owned {
     }
   }
 
+  //CALC PENALTY BASED ON THE TARGET TOKEN AND THE AMOUNT OF RESULTING ETH
+  //ONLY USED FOR TOKEN SELLS, NEVER BUYS
   function getPenalty(address token, uint256 eth) public view returns(uint256) {
+    //GRAB TOTAL EQUITY OF BOTH TOKENS
     uint256 totaleth0 = getTotalEquity();
+    //GRAB TOTAL EQUITY OF ONLY TARGET TOKEN
     uint256 tokeneth0 = getTokenEquity(token);
+    //CALC TARGET TOKEN EQUITY AFTER SELL
     uint256 tokeneth1 = tokeneth0.sub(eth);
+    //ONLY CALC PENALTY IF RATIO IS LESS THAN .5 (50%) AFTER TOKEN SELL
     if(totaleth0.div(2) >= tokeneth1) {
+      //CURRENT RATIO OF TOKEN EQUITY TO TOTAL EQUITY
       uint256 ratio0 = tokeneth0.mul(10**18).div(totaleth0);
+      //RATIO OF TOKEN EQUITY TO TOTAL EQUITY AFTER BUY
       uint256 ratio1 = tokeneth1.mul(10**18).div(totaleth0.sub(eth));
       return(balanceControlFactor.mul(ratio0.sub(ratio1).div(2)).mul(eth).div(10**9).div(10**18));
     }
@@ -485,6 +509,8 @@ contract vault is Owned {
     }
   }
 
+  //GETS CURRENT SHARE PRICE
+  //RETURNS 1 ETH IF THERE IS CURRENLY O LP
   function getSharePrice() public view returns(uint256) {
     if(totalLiqShares == 0) {
       return(liqEquity[bull].add(liqEquity[bear]).add(liqFees).add(10**18));
