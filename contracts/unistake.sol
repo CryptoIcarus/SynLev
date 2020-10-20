@@ -68,7 +68,7 @@ contract unistake is Owned {
   }
 
   IERC20 public SYN = IERC20(0x1695936d6a953df699C38CA21c2140d497C08BD9);
-  IERC20 public LPTKN = IERC20(0xdf27a38946a1ace50601ef4e10f07a9cc90d7231);
+  IERC20 public LPTKN = IERC20(0xdF27A38946a1AcE50601Ef4e10f07A9CC90d7231);
 
   uint256 public synPerLPTNKPerDay;
   uint256 public startTime;
