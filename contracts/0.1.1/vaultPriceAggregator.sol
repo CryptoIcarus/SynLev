@@ -5,6 +5,7 @@
 pragma solidity >= 0.6.6;
 
 import './ownable.sol';
+import './libraries/SafeMath.sol';
 
 interface AggregatorInterface {
   function latestAnswer() external view returns (int256);
@@ -40,12 +41,12 @@ contract vaultPriceAggregator is Owned {
   {
     uint256 currentRound = refVault[vault].ref.latestRound();
     if(currentRound > lastUpdated) {
-      uint256 pricearrayLength = 1 + currentRound - lastUpdated;
+      uint256 pricearrayLength = currentRound.add(1).sub(lastUpdated);
       pricearrayLength = pricearrayLength > maxUpdates ? maxUpdates : pricearrayLength;
       int256[] memory pricearray = new int256[] (pricearrayLength);
       pricearray[0] = refVault[vault].ref.getAnswer(lastUpdated);
       for(uint i = 1; i < pricearrayLength; i++) {
-        pricearray[pricearrayLength - i] = refVault[vault].ref.getAnswer(1 + currentRound - i);
+        pricearray[pricearrayLength.sub(i)] = refVault[vault].ref.getAnswer(currentRound.add(1).sub(i));
       }
       return(pricearray, currentRound);
     }
