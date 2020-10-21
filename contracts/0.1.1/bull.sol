@@ -8,8 +8,8 @@
 pragma solidity >= 0.6.4;
 
 import './ownable.sol';
-import './SafeMath.sol';
-import './IERC20.sol';
+import './libraries/SafeMath.sol';
+import './interfaces/IERC20.sol';
 
 contract bull is IERC20, Owned {
   using SafeMath for uint256;

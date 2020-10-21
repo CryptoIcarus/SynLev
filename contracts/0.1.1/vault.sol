@@ -5,9 +5,9 @@
 pragma solidity >= 0.6.6;
 
 import './ownable.sol';
-import './SafeMath.sol';
-import './SignedSafeMath.sol';
-import './IERC20.sol';
+import './libraries/SafeMath.sol';
+import './libraries/SignedSafeMath.sol';
+import './interfaces/IERC20.sol';
 
 interface vaultPriceAggregatorInterface {
   function priceRequest(address vault, uint256 lastUpdated) external view returns(int256[] memory, uint256);

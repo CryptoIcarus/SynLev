@@ -4,7 +4,7 @@
 
 pragma solidity >= 0.6.4;
 
-import './IERC20.sol';
+import './interfaces/IERC20.sol';
 
 interface vaultInterface {
   function tokenBuy(address token, address account) external;
