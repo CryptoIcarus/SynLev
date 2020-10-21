@@ -16,25 +16,30 @@ interface priceAggregator {
   function registerVaultAggregator(address aggregator) external;
 }
 
-
+/**
+ * @title SynLev vault contract that is the heart of the ecosystem. Responsible
+ * for calcualting price, holding all price/equity variables, and storing ETH.
+ * @author Icarus
+ */
 contract vault is Owned {
   using SafeMath for uint256;
   using SignedSafeMath for int256;
+
+  /**
+   * @notice Contract registers itself on the SynLev price aggregator contract,
+   * sets adjustable variables, and grabs latestRoundId
+   * @dev First address is non proxied SynLev vault aggregator, second address
+   * is chainlink price oracle.
+   * TODO remove "active = true" on production
+   */
   constructor() public {
-    //REGISTERS SELF ON PRICE AGGREGATOR PROXY
-    //1ST ADDRESS IS NON PROXIED PRICE AGGREGATOR
-    //2ND ADDRESS IS CHAINLINK PRICE ORACLE
     priceAggregator(0x74faB436e67e322E576fB9d37e653805F41a7E18).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
-    //SET ADJUSTABLE VARIABLES
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
     balanceControlFactor = 10**9;
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
-    //GRABS LATEST ROUND ON CONSTRUCTION, DOES NOTHING WITH PRICE DATA
     ( , latestRoundId) = priceProxy.priceRequest(address(this), latestRoundId);
-    //TURN ON ON CONSTRUCTION
-    //TODO REMOVE ON PRODUCTION
     active = true;
   }
   /////////////////////
@@ -82,52 +87,75 @@ contract vault is Owned {
     require(active == true);
     _;
   }
+
   /////////////////////
   //GLOBAL VARIBLES
   /////////////////////
 
-  //ACTIVE FLAG
+  // A
   bool public active;
 
   //LAST ROUND WE UPDATED PRICEDATA
   uint256 public latestRoundId;
 
-  //BULL & BEAR TOKENS CONTRACTS
-  //ONLY SET ONCE BY SETTOKENS()
-  //TODO MIGRATE TO USING UP AND DOWN INSTEAD OF BULL AND BEAR
+  /**
+   * @notice These are the bull and bear tokens contracts, can only be set
+   * once by setTokens()
+   */
   address public bull;
   address public bear;
 
-  //IMMUTABLE PRICE PROXY CONTRACT
+  /**
+   * @param vaultPriceAggregatorInterface immutable price aggregator proxy
+   * @param feeRecipientProxy immutable fee proxy recipient
+   */
   vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(0xE115662B3eD0D9db3af0b09C5859e405B36D1622);
-  //IMMUTABLE FEE RECIPIENT PROXY
   address payable constant public feeRecipientProxy = 0xb6C069e09dC272199280D3d25480241325d3F2dd;
 
-  //LEVERAGE AND PRICE CONTROL VARIABLES
-  //ONLY MULTIPLIER IS IMMUTABLE
+  /**
+   * @notice Leverage and price control variables that can be changed by owner
+   * to stablize asset pairs, except multiplier
+   * @param multiplier The leverage of this asset pair, immutable
+   * @param lossLimit The maximum loss on any one price calculation. Scaled
+   * 10^9 (9 * 10^8 is a 90% loss)
+   * @param kControl Upper bound limit of leverage adjuster. Scaled 10^9
+   * (15 * 10^7 represents a maximum leverage level of 4.5X)
+   * @param balanceControlFactor Scalar affecting sell penalty. Scaled 10^9
+   */
   uint256 constant public multiplier = 3;
   uint256 public lossLimit;
   uint256 public kControl;
   uint256 public balanceEquity;
   uint256 public balanceControlFactor;
 
-  //FEE VARIABLES
-  //BUYFEE IS NOT RESTRICTED SET BY SETBUYFEE()
-  //SELLFEE RESTRICTED TO 1% MAXIMUM SET BY SETSELLFEE()
-  //FEES IS A PRECENTAGE SCALED 10^9
+  /**
+   * @notice Fee variables
+   * @param buyFee Buy fee scaled 10^9
+   * @param buyFee Sell fee scaled 10^9
+   */
   uint256 public buyFee;
   uint256 public sellFee;
 
-  //LIUIDITY DATA
-  //TODO POSSIBLY TOKENIZE LP SHARES
+  /**
+   * @notice Liquidity data variables
+   * @param totalLiqShares Total number of LP shares
+   * @param liqFees Running total of all fees paid to LP
+   * @param liqTokens Virtual bull/bear tokens created by LP
+   * @param liqEquity Equity of the Virtual bull/bear tokens
+   * @param userShares Ledger of shares owned by LP
+   * TODO Possibly tokenize LP shares
+   */
   uint256 public totalLiqShares;
   uint256 public liqFees;
   mapping(address => uint256) public liqTokens;
   mapping(address => uint256) public liqEquity;
   mapping(address => uint256) public userShares;
 
-  //BULL/BEAR PRICES AND EQUITY
-  //MAPPED TO ERC20 CONTRACT ADDRESS --> ETH
+  /**
+   * @notice Bull and Bear token prices and equity, not including LP
+   * @param price bull/bear token address --> token price
+   * @param buyFee bull/bear token address --> token equity
+   */
   mapping(address => uint256) public price;
   mapping(address => uint256) public equity;
 
@@ -141,115 +169,105 @@ contract vault is Owned {
   //          CONTRACTS             //
   ////////////////////////////////////
 
-  //BUY BULL OR BEAR TOKENS
-  //IS NOT PAYABLE AS TO BE EASILY CALLED BY PROXY CONTRACT,
-  //LOOKS HOW MUCH EXCESS ETH CONTRACT HAS
-  function tokenBuy(address token, address account) public virtual  {
-    //HOW MUCH EXCESS ETH DO WE HAVE?
+  /**
+   * @notice Buys bull or bear token and updates price before token buy.
+   * @param _token bull or bear token address
+   * @param _account Recipient of newly minted tokens
+   * @dev Should only be called by a router contract. Checks the excess ETH in
+   * contract by calling getDepositEquity(). Can't 0 ETH buy. Calculates
+   * resulting tokens and fees. Sends fees and mints tokens.
+   *
+   */
+  function tokenBuy(address _token, address _account) public virtual isActive()  {
     uint256 ethin = getDepositEquity();
-    //DON'T ALLOW 0 ETH TOKEN BUY AND MUST BE A REAL TOKEN
     require(ethin > 0);
-    require(token == bull || token == bear);
-    //UPDATE PRICE BEFORE ANY CALCULATION DONE
+    require(_token == bull || _token == bear);
     updatePrice();
-    //CREATE IERC20 TOKEN INTERFACE
-    IERC20 itkn = IERC20(token);
-    //CALC FEES
+    IERC20 itkn = IERC20(_token);
     uint256 fees = ethin.mul(buyFee).div(10**9);
-    //ETH LESS FEES
     uint256 buyeth = ethin.sub(fees);
-    //GRAB BONUS IN ETH
-    uint256 bonus = getBonus(token, buyeth);
-    //CALC TOKENS TO MINT RESULTS IN ERROR ON IF PRICE REACHES 0
-    uint256 tokensToMint = buyeth.add(bonus).mul(10**18).div(price[token]);
-    //UPDATE TOKEN EQUITY
-    equity[token] = equity[token].add(buyeth).add(bonus);
-    //IF BONUS WAS APPLIED UPDATE THE BALANCE EQUITY
+    uint256 bonus = getBonus(_token, buyeth);
+    uint256 tokensToMint = buyeth.add(bonus).mul(10**18).div(price[_token]);
+    equity[_token] = equity[_token].add(buyeth).add(bonus);
     if(bonus != 0) balanceEquity = balanceEquity.sub(bonus);
-    //PAY THE LP AND SYN STAKERS
     payFees(fees);
-    //MINT TOKENS TO ACCOUNT
-    itkn.mint(account, tokensToMint);
-    emit TokenBuy(account, token, tokensToMint, ethin, fees, bonus);
+    itkn.mint(_account, tokensToMint);
+
+    emit TokenBuy(_account, _token, tokensToMint, ethin, fees, bonus);
   }
 
-  //SELL BULL OR BEAR TOKENS
-  //LOOKS HOW MANY TOKENS CONTRACT IS HOLDING,
-  function tokenSell(address token, address payable account) public virtual {
-    //CREATE IERC20 TOKEN INTERFACE
+  /**
+   * @notice Sells bull or bear token and updates price before token sell.
+   * @param _token bull or bear token address
+   * @param _account Recipient of resulting eth from burned tokens
+   * @dev Should only be called by a router contract that simultaneously sends
+   * tokens using transferFrom() and calls this function. Looks at the current
+   * balance of the contract of the selected token. Can't 0 token sell.
+   * Calculates resulting ETH from burned tokens. Pays fees, burns tokens, and
+   * sends ETH.
+   */
+  function tokenSell(address token, address payable _account) public virtual {
     IERC20 itkn = IERC20(token);
-    //HOW MANY TOKENS DOES
     uint256 tokensToBurn = itkn.balanceOf(address(this));
-    //DONT ALLOW 0 TOKEN SELL AND MUST BE A REAL TOKEN
     require(tokensToBurn > 0);
     require(token == bull || token == bear);
-    //UPDATE PRICE BEFORE ANY CALCULATION DONE
     updatePrice();
-    //CALCUALTE RESULTING ETH FROM TOKENS SOLD BURNED
     uint256 selleth = tokensToBurn.mul(price[token]).div(10**18);
-    //GRAB PENALTY IN ETH
     uint256 penalty = getPenalty(token, selleth);
-    //CALC FEES IN ETH
     uint256 fees = sellFee.mul(selleth.sub(penalty)).div(10**9);
-    //RESULTING ETH LESS PENALTY AND FEES
     uint256 ethout = selleth.sub(penalty).sub(fees);
-    //UPDATE TOKEN EQUITY
     equity[token] = equity[token].sub(selleth);
-    //IF PENALTY UPDATE BALANCE EQUITY
     if(penalty != 0) balanceEquity = balanceEquity.add(penalty);
-    //PAY THE LP AND SYN STAKERS
     payFees(fees);
-    //BURN THEM TOKENS
     itkn.burn(tokensToBurn);
-    //SEND SELLER THEIR ETH
-    account.transfer(ethout);
-    emit TokenSell(account, token, tokensToBurn, ethout, fees, penalty);
+    _account.transfer(ethout);
+
+    emit TokenSell(_account, token, tokensToBurn, ethout, fees, penalty);
   }
 
-  //USER ADDING LIQUIDTY DIRECTLY TO VAULT CONTRACT (NO PROXY)
-  //LOOKS AT EXCESS ETH SAME AS BUY FUNCTION
-  //ONLY DEALS IN TERMS OF TOKEN EQUITY AND SUPPLY. IGNORES PRICES
-  //AS LEADS TO ROUNDING ERRORS ERRORS
-  function addLiquidity(address account) public payable virtual {
-    //HOW MUCH EXCESS ETH DO WE HAVE?
+  /**
+   * @notice Adds liquidty to the contract and gives LP shares. Minimum LP add
+   * is 1 wei. Virtually mints bear/bull tokens to be held in the vault.
+   * @param _account Recipient of LP shares
+   * @dev Can be called by router but there is benefit to doing so. All
+   * calculations are done with respect to equity and supply. Doing by price
+   * creates rounding error. Calls updatePrice() then calls getLiqAddTokens()
+   * to determine how many bull/bear to create.
+   */
+  function addLiquidity(address _account) public payable virtual {
     uint256 ethin = getDepositEquity();
-    //DON'T ALLOW ZERO ETH LP
-    require(ethin >= 0);
-    //UPDATE PRICE BEFORE ANYTHING IS DONE
     updatePrice();
-    //CALC RESULTING ADDITIONAL LIQUDITY EQUITY AND TOKEN SUPPLY
     (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens)
     = getLiqAddTokens(ethin);
-    //GRAB LP SHARE PRICE
     uint256 sharePrice = getSharePrice();
-    //CALC RESULTING SHARES FROM DEPOSITED ETH
     uint256 resultingShares = ethin.mul(10**18).div(sharePrice);
-    //UPDATE ALL LIQUDITY DATA & GIVE USER SHARES
     liqEquity[bull] = liqEquity[bull].add(bullEquity);
     liqEquity[bear] = liqEquity[bear].add(bearEquity);
     liqTokens[bull] = liqTokens[bull].add(bullTokens);
     liqTokens[bear] = liqTokens[bear].add(bearTokens);
-    userShares[account] = userShares[account].add(resultingShares);
+    userShares[_account] = userShares[_account].add(resultingShares);
     totalLiqShares = totalLiqShares.add(resultingShares);
 
-    emit LiquidityAdd(account, ethin, resultingShares, sharePrice);
+    emit LiquidityAdd(_account, ethin, resultingShares, sharePrice);
   }
 
-  //USER DIRECTLY REMOVING LIQUIDY FROM THE VAULT (NO PROXY)
-  //TODO IF LIQUDITY IS TOKENIZED THIS CAN BE PROXIED
+  /**
+   * @notice Removes liquidty to the contract and gives LP shares. Virtually
+   * burns bear/bull tokens to be held in the vault. Cannot be called if user
+   * has 0 shares
+   * @param _shares How many shares to burn
+   * @dev Cannot be called by a router as LP shares are not currently tokenized.
+   * Calls updatePrice() then calls getLiqRemoveTokens() to determine how many
+   * bull/bear tokens to remove.
+   * TODO If LP is tokenized check deposit via IERC20 balanceOf()
+   */
   function removeLiquidity(uint256 shares) public virtual {
-    //USER MUST HAVE SHARES
     require(shares <= userShares[msg.sender]);
-    //UPDATE PRICE
     updatePrice();
-    //CALC LIQUDITY EQUITY AND TOKEN SUPPLY TO BE REMOVED
     (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens, uint256 feesPaid)
     = getLiqRemoveTokens(shares);
-    //GRAB LP SHARE PRICE
     uint256 sharePrice = getSharePrice();
-    //CALC RESULTING ETH FROM BURNED LP SHARES
     uint256 resultingEth = bullEquity.add(bearEquity).add(feesPaid);
-    //UPDATE ALL LIQUDITY DATA & BURN USER SHARES
     liqEquity[bull] = liqEquity[bull].sub(bullEquity);
     liqEquity[bear] = liqEquity[bear].sub(bearEquity);
     liqTokens[bull] = liqTokens[bull].sub(bullTokens);
@@ -257,17 +275,20 @@ contract vault is Owned {
     userShares[msg.sender] = userShares[msg.sender].sub(shares);
     totalLiqShares = totalLiqShares.sub(shares);
     liqFees = liqFees.sub(feesPaid);
-    //SEND ETH
     msg.sender.transfer(resultingEth);
 
     emit LiquidityRemove(msg.sender, resultingEth, shares, sharePrice);
   }
 
-  //PUBLIC UPDATE PRICE FUNCTION
-  //RETURNS ALL BOOL IF THE PRICE WAS UPDATED
-  //TODO SWITCH TO ALWAYS EMIT PRICE DATA
-  function updatePrice(
-  )
+  /**
+   * @notice Updates price from chainlink oracles.
+   * @param _shares How many shares to burn
+   * @dev Calls getUpdatedPrice() function and sets new price, equity, liquidity
+   * equity, and latestRoundId; only if there is new price data
+   * @return bool if price was updated
+   * TODO Switch to always emit price data.
+   */
+  function updatePrice()
   public
   returns(bool)
   {
@@ -280,7 +301,6 @@ contract vault is Owned {
       uint256 bearEquity,
       uint256 roundId
     ) = getUpdatedPrice();
-    //ONLY SET IF CHAINLINK ORACLE HAS NEWER ROUNDID
     if(roundId > latestRoundId) {
       (
         price[bull],
@@ -320,8 +340,12 @@ contract vault is Owned {
   //INTERNAL FUNCTIONS///
   ///////////////////////
 
-  //SPLITS ANY FEES IF BETWEEN SYN STAKERS AND LP
-  //TODO HANDLE CASE THAT THERE ARE NO LP
+  /**
+   * @notice Pays half fees to SYN stakers and half to LP
+   * @param _amount Fees to be paid in ETH
+   * @dev Only called by tokenBuy() nad tokenSell()
+   * TODO Handle case if there are no LP
+   */
   function payFees(uint256 amount) internal {
     feeRecipientProxy.transfer(amount.div(2));
     liqFees += amount.sub(amount.div(2));
@@ -331,14 +355,18 @@ contract vault is Owned {
   ///VIEW FUNCTIONS//
   ///////////////////
 
-  //CALCUALTES UPDATED PRICE DATA
-  //IF THERE IS NO NEW PRICE DATA JUST RETURNS CURRENT PRICE DATA
-  //SAFETY CHECKS ARE DONE BY PRICE AGGREGATOR CONTRACT
-  //NAME IS MISLEADING, DOES NOT PRICE CALCUALTIONS. CALCUALTES PRICES BASED
-  //ON EQUITY.
-  //IMPORTANT TO CALCULATE THE PRICE FROM UP/DOWN PERSPECTIVE AS ROUNDING
-  //INACCURACY OVER TIME WILL ADD UP IF CALCUALTIONS ARE ALWAYS DONE FROM THE
-  //SAME PERSPECTIVE
+  /**
+   * @notice Calculates the most recent price data.
+   * @dev If there is no new price data it returns current price/equity data.
+   * Safety checks are done by SynLev price aggregator. All calcualtions done
+   * via equity in ETH, not price to avoid rounding errors. Caculates price
+   * based on the "losing side", then subracts from the other. Mitigates a
+   * prefrence in rounding error to either bull or bear tokens.
+   * TODO Check if more gas efficient to create two separate functions to get k
+   * values.
+   * TODO Migrate grabbing current equity variables to after token equity check
+   * for potential gas savings
+   */
   function getUpdatedPrice()
   public
   view
@@ -351,58 +379,54 @@ contract vault is Owned {
     uint256 rBearEquity,
     uint256 rRoundId
   ) {
-    //REQUESTS PRICE DATA FROM PRICE AGGREGATOR PROXY
+    //Requests price data from price aggregator proxy
     (
       int256[] memory priceData,
       uint256 roundId
     ) = priceProxy.priceRequest(address(this), latestRoundId);
-    //ONLY UPDATE IF PRICE DATA IF PRICE ARRAY CONTAINS 2 OR MORE VALUES
-    //IF THERE IS NO NEW PRICE DATA PRICEDATE ARRAY WILL HAVE 0 LENGTH
+    //Only update if price data if price array contains 2 or more values
+    //If there is no new price data pricedate array will have 0 length
     if(priceData.length > 0) {
-      //TODO MIGRATE BELOW DECLARED VARIABLES TO LIVE AFTER TOKEN EQUITY CHECK
-      //FOR POTENTIAL GAS SAVINGS
-      //GRAB CURRENT TOKEN EQUITY DATA
+      //Grab current token equity data
       uint256 bullEquity = getTokenEquity(bull);
       uint256 bearEquity = getTokenEquity(bear);
       uint256 totalEquity = getTotalEquity();
-      //DECLARE VARIALBES FOR KEEPING TRACK OF PRICE DURRING CALCUALTIONS
+      //Declare varialbes for keeping track of price durring calcualtions
       uint256 movement;
       uint256 bearKFactor;
       uint256 bullKFactor;
       uint256 pricedelta;
-      //ONLY UPDATE IF THERE IS SOME BULL/BEAR EQUITY
+      //Only update if there is some bull/bear equity
       if(bullEquity != 0 && bearEquity != 0) {
-        //PRICE CALC LOOP
+        //Price calc loop
         for (uint i = 1; i < priceData.length; i++) {
-          //GRAB K FACTOR BASED ON RUNNING EQUITY
-          //TODO CHECK IF MORE GAS EFFIECNT TO CREATE TWO SEPARATE FUNCTIONS
-          //FOR TOKEN K VALUES
+          //Grab k factor based on running equity
           bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
           bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
           if(priceData[i-1] != priceData[i]) {
-            //BEARISH MOVEMENT, CALC EQUITY FROM THE PERSPECTIVE OF BULL
+            //Bearish movement, calc equity from the perspective of bull
             if(priceData[i-1] > priceData[i]) {
-              //TREATS 0 PRICE VALUE AS 1, 0 CAUSES DIVIDES BY 0 ERROR
+              //Treats 0 price value as 1, 0 causes divides by 0 error
               if(priceData[i-1] == 0) priceData[i-1] = 1;
-              //GETS PRICE CHANGE IN ABSOLUTE TERMS.
-              //HANDLES POSSIBLE NEGATIVE PRICE DATA
+              //Gets price change in absolute terms.
+              //Handles possible negative price data
               pricedelta = priceData[i-1] > 0 ?
                 uint256(priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1])) :
                 uint256(-priceData[i-1].sub(priceData[i]).mul(10**9).div(priceData[i-1]));
-              //CONVERTS PRICE CHANGE TO BE IN TERMS OF BULL EQUITY CHANGE
-              //AS A PERCENTAGE
+              //Converts price change to be in terms of bull equity change
+              //As a percentage
               pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(10**9);
-              //DONT ALLOW LOSS TO BE GREATER THAN SET LOSS LIMIT
+              //Dont allow loss to be greater than set loss limit
               pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
-              //CALCULATE EQUITY LOSS OF BULL EQUITY
+              //Calculate equity loss of bull equity
               movement = bullEquity.mul(pricedelta).div(10**9);
-              //ADDS EQUITY MOVEMENT TO RUNNING BEAR EUQITY AND REMOVES THAT
-              //LOSS FROM RUNNING BULL EQUITY
+              //Adds equity movement to running bear euqity and removes that
+              //Loss from running bull equity
               bearEquity = bearEquity.add(movement);
               bullEquity = totalEquity.sub(bearEquity);
             }
-            //BULLISH MOVEMENT, CALC EQUITY FROM THE PERSPECTIVE OF BEAR
-            //SAME PROCESS AS ABOVE. ONLY FROM BEAR PERSPECTIVE
+            //Bullish movement, calc equity from the perspective of bear
+            //Same process as above. only from bear perspective
             else if(priceData[i-1] < priceData[i]) {
               if(priceData[i] == 0) priceData[i] = 1;
               pricedelta = priceData[i] > 0 ?
@@ -440,46 +464,58 @@ contract vault is Owned {
     }
   }
 
-  //K FACTOR IS THE MULTIPLIER THAT ADJUSTS THE LEVERAGE LEVEL TO MAINTAIN 100%
-  //LIQUIDTY AT ALL TIMES.
-  //K FACTOR OF 1 (10^9) REPRESENTS A 1:1 RATIO OF BULL : BEAR EQUITY
-  //TAKES TARGET EQUITY (THE K FACTOR OF THE TARGET TOKEN)
+  /**
+   * @notice Calculates k factor of selected token. K factor is the multiplier
+   * that adjusts the leverage level to maintain 100% liquidty at all times.
+   * @dev K factor is scaled 10^9. A K factor of 1 represents a 1:1 ratio of
+   * bull and bear equity.
+   * @param targetEquity The total euqity of the target bull token
+   * @param bullEquity The total equity bull tokens
+   * @param bearEquity The total equity bear tokens
+   * @param totalEquity The total equity of bull and bear tokens
+   * @return K factor
+   * TODO Check if neccesary to do divides by 0 check
+   */
   function getKFactor(uint256 targetEquity, uint256 bullEquity, uint256 bearEquity, uint256 totalEquity)
   public
   view
   returns(uint256) {
-    //IF EITHER TOKEN HAS 0 EQUITY K VALUE IS 0
+    //If either token has 0 equity k value is 0
     if(bullEquity  == 0 || bearEquity == 0) {
       return(0);
     }
     else {
-      //AVOIDS DIVIDES BY 0 ERROR
-      //TODO CHECK IF NECCESARY TO DO THIS CHECK
+      //Avoids divides by 0 error
       targetEquity = targetEquity > 0 ? targetEquity : 1;
       uint256 kFactor = totalEquity.mul(10**9).div(targetEquity.mul(2)) < kControl ? totalEquity.mul(10**9).div(targetEquity.mul(2)): kControl;
       return(kFactor);
     }
   }
 
-  //CALC BONUS BASED ON THE TARGET TOKEN AND THE AMOUNT OF ETH USED TO BUY
-  //ONLY USED FOR TOKEN BUYS, NEVER SELLS
+  /**
+   * @notice Returns the buy bonus based on the incoming ETH and selected token.
+   * Only relevant to token buys
+   * @param token The selected bull or bear token
+   * @param eth The amount of ETH to be added
+   * @return Bonus in ETH
+   * TODO Change to simpler check as k factor no longer used to calc bonus
+   */
   function getBonus(address token, uint256 eth) public view returns(uint256) {
-    //GRAB TOTAL EQUITY OF BOTH TOKENS
+    //Grab total equity of both tokens
     uint256 totaleth0 = getTotalEquity();
-    //GRAB TOTAL EQUITY OF ONLY TARGET TOKEN
+    //Grab total equity of only target token
     uint256 tokeneth0 = getTokenEquity(token);
-    //GRAB TARGET TOKEN K FACTOR TO CHECK IF BONUS SHOULD CALC
-    //TODO CHANGE TO SIMPLER CHECK AS K FACTOR NO LONGER USED TO CALC BONUS
+    //Grab target token k factor to check if bonus should calc
     uint256 kFactor = getKFactor(tokeneth0, getTokenEquity(bull), getTokenEquity(bear), totaleth0);
     bool t = kFactor == 0 ? tokeneth0 == 0 : true;
-    //CHECK IF WE NEED TO CALC A BONUS
+    //Check if we need to calc a bonus
     if(t == true && balanceEquity > 0 && totaleth0 > tokeneth0 * 2) {
-      //CURRENT RATIO OF TOKEN EQUITY TO TOTAL EQUITY
+      //Current ratio of token equity to total equity
       uint256 ratio0 = tokeneth0.mul(10**18).div(totaleth0);
-      //RATIO OF TOKEN EQUITY TO TOTAL EQUITY AFTER BUY
+      //Ratio of token equity to total equity after buy
       uint256 ratio1 = tokeneth0.add(eth).mul(10**18).div(totaleth0.add(eth));
-      //IF THE AFTER BUY RATIO IS GRATER THAN .5 (50%) WE REWARD THE ENTIRE
-      //BALANCE EQUITY
+      //If the after buy ratio is grater than .5 (50%) we reward the entire
+      //balance equity
       return(ratio1 <= 5 * 10**17 ? ratio1.sub(ratio0).mul(10**18).div(5 * 10**17 - ratio0).mul(balanceEquity).div(10**18) : balanceEquity);
     }
     else {
@@ -487,20 +523,25 @@ contract vault is Owned {
     }
   }
 
-  //CALC PENALTY BASED ON THE TARGET TOKEN AND THE AMOUNT OF RESULTING ETH
-  //ONLY USED FOR TOKEN SELLS, NEVER BUYS
+  /**
+   * @notice Returns the sell penalty based on the outgoing ETH and selected
+   * token. Only relevant to token sells.
+   * @param token The selected bull or bear token
+   * @param eth The amount of outgoing ETH
+   * @return Penalty in ETH
+   */
   function getPenalty(address token, uint256 eth) public view returns(uint256) {
-    //GRAB TOTAL EQUITY OF BOTH TOKENS
+    //Grab total equity of both tokens
     uint256 totaleth0 = getTotalEquity();
-    //GRAB TOTAL EQUITY OF ONLY TARGET TOKEN
+    //Grab total equity of only target token
     uint256 tokeneth0 = getTokenEquity(token);
-    //CALC TARGET TOKEN EQUITY AFTER SELL
+    //Calc target token equity after sell
     uint256 tokeneth1 = tokeneth0.sub(eth);
-    //ONLY CALC PENALTY IF RATIO IS LESS THAN .5 (50%) AFTER TOKEN SELL
+    //Only calc penalty if ratio is less than .5 (50%) after token sell
     if(totaleth0.div(2) >= tokeneth1) {
-      //CURRENT RATIO OF TOKEN EQUITY TO TOTAL EQUITY
+      //Current ratio of token equity to total equity
       uint256 ratio0 = tokeneth0.mul(10**18).div(totaleth0);
-      //RATIO OF TOKEN EQUITY TO TOTAL EQUITY AFTER BUY
+      //Ratio of token equity to total equity after buy
       uint256 ratio1 = tokeneth1.mul(10**18).div(totaleth0.sub(eth));
       return(balanceControlFactor.mul(ratio0.sub(ratio1).div(2)).mul(eth).div(10**9).div(10**18));
     }
@@ -509,8 +550,12 @@ contract vault is Owned {
     }
   }
 
-  //GETS CURRENT SHARE PRICE
-  //RETURNS 1 ETH IF THERE IS CURRENLY O LP
+  /**
+   * @notice Returns the current LP share price. Defaults to 1 ETH if 0 LP
+   * @param token The selected bull or bear token
+   * @param eth The amount of outgoing ETH
+   * @return Penalty in ETH
+   */
   function getSharePrice() public view returns(uint256) {
     if(totalLiqShares == 0) {
       return(liqEquity[bull].add(liqEquity[bear]).add(liqFees).add(10**18));
@@ -520,6 +565,12 @@ contract vault is Owned {
     }
   }
 
+
+  /**
+   * @notice Calc how many bull/bear tokens virtually mint based on incoming
+   * ETH.
+   * @returns bull/bear equity and bull/bear tokens to be added
+  */
   function getLiqAddTokens(uint256 eth)
   public
   view
@@ -552,6 +603,13 @@ contract vault is Owned {
       bearEquity.mul(10**18).div(price[bear])
     );
   }
+
+  /**
+   * @notice Calc how many bull/bear tokens virtually burn based on shares
+   * being removed.
+   * @param shares Amount of shares user removing from LP
+   * @returns bull/bear equity and bull/bear tokens to be removed
+  */
   function getLiqRemoveTokens(uint256 shares)
   public
   view
@@ -596,7 +654,6 @@ contract vault is Owned {
     );
   }
 
-  //FOR OTHER CONTRACTS TO CALL ANY NON CONSTANT VARIABLE OR MAPPING
   function getBullToken() public view returns(address) {return(bull);}
   function getBearToken() public view returns(address) {return(bear);}
   function getMultiplier() public pure returns(uint256) {return(multiplier);}
