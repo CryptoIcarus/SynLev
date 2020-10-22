@@ -16,7 +16,7 @@ interface priceAggregator {
   function registerVaultAggregator(address aggregator) external;
 }
 
-/**
+/*
  * @title SynLev vault contract that is the heart of the ecosystem. Responsible
  * for calcualting price, holding all price/equity variables, and storing ETH.
  * @author Icarus
@@ -25,7 +25,7 @@ contract vault is Owned {
   using SafeMath for uint256;
   using SignedSafeMath for int256;
 
-  /**
+  /*
    * @notice Contract registers itself on the SynLev price aggregator contract,
    * sets adjustable variables, and grabs latestRoundId
    * @dev First address is non proxied SynLev vault aggregator, second address
@@ -98,21 +98,21 @@ contract vault is Owned {
   //LAST ROUND WE UPDATED PRICEDATA
   uint256 public latestRoundId;
 
-  /**
+  /*
    * @notice These are the bull and bear tokens contracts, can only be set
    * once by setTokens()
    */
   address public bull;
   address public bear;
 
-  /**
+  /*
    * @param vaultPriceAggregatorInterface immutable price aggregator proxy
    * @param feeRecipientProxy immutable fee proxy recipient
    */
   vaultPriceAggregatorInterface constant public priceProxy = vaultPriceAggregatorInterface(0xE115662B3eD0D9db3af0b09C5859e405B36D1622);
   address payable constant public feeRecipientProxy = 0xb6C069e09dC272199280D3d25480241325d3F2dd;
 
-  /**
+  /*
    * @notice Leverage and price control variables that can be changed by owner
    * to stablize asset pairs, except multiplier
    * @param multiplier The leverage of this asset pair, immutable
@@ -128,7 +128,7 @@ contract vault is Owned {
   uint256 public balanceEquity;
   uint256 public balanceControlFactor;
 
-  /**
+  /*
    * @notice Fee variables
    * @param buyFee Buy fee scaled 10^9
    * @param buyFee Sell fee scaled 10^9
@@ -136,7 +136,7 @@ contract vault is Owned {
   uint256 public buyFee;
   uint256 public sellFee;
 
-  /**
+  /*
    * @notice Liquidity data variables
    * @param totalLiqShares Total number of LP shares
    * @param liqFees Running total of all fees paid to LP
@@ -151,7 +151,7 @@ contract vault is Owned {
   mapping(address => uint256) public liqEquity;
   mapping(address => uint256) public userShares;
 
-  /**
+  /*
    * @notice Bull and Bear token prices and equity, not including LP
    * @param price bull/bear token address --> token price
    * @param buyFee bull/bear token address --> token equity
@@ -169,7 +169,7 @@ contract vault is Owned {
   //          CONTRACTS             //
   ////////////////////////////////////
 
-  /**
+  /*
    * @notice Buys bull or bear token and updates price before token buy.
    * @param _token bull or bear token address
    * @param _account Recipient of newly minted tokens
@@ -225,7 +225,7 @@ contract vault is Owned {
     emit TokenSell(_account, token, tokensToBurn, ethout, fees, penalty);
   }
 
-  /**
+  /*
    * @notice Adds liquidty to the contract and gives LP shares. Minimum LP add
    * is 1 wei. Virtually mints bear/bull tokens to be held in the vault.
    * @param _account Recipient of LP shares
@@ -355,7 +355,7 @@ contract vault is Owned {
   ///VIEW FUNCTIONS//
   ///////////////////
 
-  /**
+  /*
    * @notice Calculates the most recent price data.
    * @dev If there is no new price data it returns current price/equity data.
    * Safety checks are done by SynLev price aggregator. All calcualtions done
@@ -462,7 +462,7 @@ contract vault is Owned {
     }
   }
 
-  /**
+  /*
    * @notice Calculates k factor of selected token. K factor is the multiplier
    * that adjusts the leverage level to maintain 100% liquidty at all times.
    * @dev K factor is scaled 10^9. A K factor of 1 represents a 1:1 ratio of
@@ -485,12 +485,14 @@ contract vault is Owned {
     else {
       //Avoids divides by 0 error
       targetEquity = targetEquity > 0 ? targetEquity : 1;
-      uint256 kFactor = totalEquity.mul(10**9).div(targetEquity.mul(2)) < kControl ? totalEquity.mul(10**9).div(targetEquity.mul(2)): kControl;
+      uint256 kFactor =
+        totalEquity.mul(10**9).div(targetEquity.mul(2)) < kControl ?
+        totalEquity.mul(10**9).div(targetEquity.mul(2)): kControl;
       return(kFactor);
     }
   }
 
-  /**
+  /*
    * @notice Returns the buy bonus based on the incoming ETH and selected token.
    * Only relevant to token buys
    * @param token The selected bull or bear token
@@ -503,9 +505,6 @@ contract vault is Owned {
     uint256 totaleth0 = getTotalEquity();
     //Grab total equity of only target token
     uint256 tokeneth0 = getTokenEquity(token);
-    //Grab target token k factor to check if bonus should calc
-    uint256 kFactor = getKFactor(tokeneth0, getTokenEquity(bull), getTokenEquity(bear), totaleth0);
-    bool t = kFactor == 0 ? tokeneth0 == 0 : true;
     //Check if we need to calc a bonus
     if(balanceEquity > 0 && totaleth0 > tokeneth0.mul(2)) {
       //Current ratio of token equity to total equity
@@ -514,14 +513,18 @@ contract vault is Owned {
       uint256 ratio1 = tokeneth0.add(eth).mul(10**18).div(totaleth0.add(eth));
       //If the after buy ratio is grater than .5 (50%) we reward the entire
       //balance equity
-      return(ratio1 <= 5 * 10**17 ? ratio1.sub(ratio0).mul(10**18).div(5 * 10**17 - ratio0).mul(balanceEquity).div(10**18) : balanceEquity);
+      return(
+        ratio1 <= 5 * 10**17 ?
+        ratio1.sub(ratio0).mul(10**18).div(5 * 10**17 - ratio0).mul(balanceEquity).div(10**18) :
+        balanceEquity
+      );
     }
     else {
       return(0);
     }
   }
 
-  /**
+  /*
    * @notice Returns the sell penalty based on the outgoing ETH and selected
    * token. Only relevant to token sells.
    * @param token The selected bull or bear token
