@@ -286,7 +286,6 @@ contract vault is Owned {
    * @dev Calls getUpdatedPrice() function and sets new price, equity, liquidity
    * equity, and latestRoundId; only if there is new price data
    * @return bool if price was updated
-   * TODO Switch to always emit price data.
    */
   function updatePrice()
   public
@@ -320,20 +319,20 @@ contract vault is Owned {
         bearEquity,
         roundId
       );
-      emit PriceUpdate(
-        price[bull],
-        price[bear],
-        liqEquity[bull],
-        liqEquity[bear],
-        equity[bull],
-        equity[bear],
-        latestRoundId
-      );
       return(true);
     }
     else {
       return(false);
     }
+    emit PriceUpdate(
+      price[bull],
+      price[bear],
+      liqEquity[bull],
+      liqEquity[bear],
+      equity[bull],
+      equity[bear],
+      latestRoundId
+    );
   }
 
   ///////////////////////
