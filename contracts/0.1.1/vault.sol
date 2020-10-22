@@ -196,7 +196,7 @@ contract vault is Owned {
     emit TokenBuy(_account, _token, tokensToMint, ethin, fees, bonus);
   }
 
-  /**
+  /*
    * @notice Sells bull or bear token and updates price before token sell.
    * @param _token bull or bear token address
    * @param _account Recipient of resulting eth from burned tokens
@@ -251,7 +251,7 @@ contract vault is Owned {
     emit LiquidityAdd(_account, ethin, resultingShares, sharePrice);
   }
 
-  /**
+  /*
    * @notice Removes liquidty to the contract and gives LP shares. Virtually
    * burns bear/bull tokens to be held in the vault. Cannot be called if user
    * has 0 shares
@@ -280,7 +280,7 @@ contract vault is Owned {
     emit LiquidityRemove(msg.sender, resultingEth, shares, sharePrice);
   }
 
-  /**
+  /*
    * @notice Updates price from chainlink oracles.
    * @param _shares How many shares to burn
    * @dev Calls getUpdatedPrice() function and sets new price, equity, liquidity
@@ -340,7 +340,7 @@ contract vault is Owned {
   //INTERNAL FUNCTIONS///
   ///////////////////////
 
-  /**
+  /*
    * @notice Pays half fees to SYN stakers and half to LP
    * @param _amount Fees to be paid in ETH
    * @dev Only called by tokenBuy() nad tokenSell()
@@ -388,10 +388,9 @@ contract vault is Owned {
     //If there is no new price data pricedate array will have 0 length
     if(priceData.length > 0) {
       //Only update if there is soome bull/bear equity
+      uint256 bullEquity = getTokenEquity(bull);
+      uint256 bearEquity = getTokenEquity(bear);
       if(bullEquity != 0 && bearEquity != 0) {
-        //Grab current token equity data
-        uint256 bullEquity = getTokenEquity(bull);
-        uint256 bearEquity = getTokenEquity(bear);
         uint256 totalEquity = getTotalEquity();
         //Declare varialbes for keeping track of price durring calcualtions
         uint256 movement;
@@ -508,7 +507,7 @@ contract vault is Owned {
     uint256 kFactor = getKFactor(tokeneth0, getTokenEquity(bull), getTokenEquity(bear), totaleth0);
     bool t = kFactor == 0 ? tokeneth0 == 0 : true;
     //Check if we need to calc a bonus
-    if(t == true && balanceEquity > 0 && totaleth0 > tokeneth0 * 2) {
+    if(balanceEquity > 0 && totaleth0 > tokeneth0.mul(2)) {
       //Current ratio of token equity to total equity
       uint256 ratio0 = tokeneth0.mul(10**18).div(totaleth0);
       //Ratio of token equity to total equity after buy
@@ -549,7 +548,7 @@ contract vault is Owned {
     }
   }
 
-  /**
+  /*
    * @notice Returns the current LP share price. Defaults to 1 ETH if 0 LP
    * @param token The selected bull or bear token
    * @param eth The amount of outgoing ETH
@@ -565,7 +564,7 @@ contract vault is Owned {
   }
 
 
-  /**
+  /*
    * @notice Calc how many bull/bear tokens virtually mint based on incoming
    * ETH.
    * @returns bull/bear equity and bull/bear tokens to be added
@@ -603,7 +602,7 @@ contract vault is Owned {
     );
   }
 
-  /**
+  /*
    * @notice Calc how many bull/bear tokens virtually burn based on shares
    * being removed.
    * @param shares Amount of shares user removing from LP
