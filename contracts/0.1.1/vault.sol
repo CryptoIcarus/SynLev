@@ -387,18 +387,17 @@ contract vault is Owned {
     //Only update if price data if price array contains 2 or more values
     //If there is no new price data pricedate array will have 0 length
     if(priceData.length > 0) {
-      //Grab current token equity data
-      uint256 bullEquity = getTokenEquity(bull);
-      uint256 bearEquity = getTokenEquity(bear);
-      uint256 totalEquity = getTotalEquity();
-      //Declare varialbes for keeping track of price durring calcualtions
-      uint256 movement;
-      uint256 bearKFactor;
-      uint256 bullKFactor;
-      uint256 pricedelta;
-      //Only update if there is some bull/bear equity
+      //Only update if there is soome bull/bear equity
       if(bullEquity != 0 && bearEquity != 0) {
-        //Price calc loop
+        //Grab current token equity data
+        uint256 bullEquity = getTokenEquity(bull);
+        uint256 bearEquity = getTokenEquity(bear);
+        uint256 totalEquity = getTotalEquity();
+        //Declare varialbes for keeping track of price durring calcualtions
+        uint256 movement;
+        uint256 bearKFactor;
+        uint256 bullKFactor;
+        uint256 pricedelta;
         for (uint i = 1; i < priceData.length; i++) {
           //Grab k factor based on running equity
           bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
