@@ -5,7 +5,7 @@
 pragma solidity >= 0.6.4;
 
 import './ownable.sol';
-import './interfaces/priceAggregator.sol'
+import './interfaces/priceAggregatorInterface.sol';
 
 contract priceAggregatorProxy is Owned {
 
@@ -33,7 +33,7 @@ contract priceAggregatorProxy is Owned {
   }
 
   function proposeVaultPriceAggregator(address account) public onlyOwner() {
-    vaultPriceAggregatorPropose = account;
+    priceAggregatorPropose = account;
     proposeTimestamp = block.timestamp;
   }
   function updateVaultAggregator() public {

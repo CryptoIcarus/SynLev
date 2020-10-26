@@ -20,8 +20,8 @@ contract vault is Owned {
 
   constructor() public {
     priceAggregatorInterface(0).registerVaultAggregator(0);
-    priceCalculator = priceCalculatorInterface(0);
-    vaultHelper = vaultHelperInterface(0);
+    //priceCalculator = priceCalculatorInterface(0);
+    //vaultHelper = vaultHelperInterface(0);
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
     ( , latestRoundId) = priceAggregatorInterface(0).priceRequest(address(this), latestRoundId);
@@ -230,12 +230,7 @@ contract vault is Owned {
   public
   {
     (
-      uint256 bullPrice,
-      uint256 bearPrice,
-      uint256 bullLiqEquity,
-      uint256 bearLiqEquity,
-      uint256 bullEquity,
-      uint256 bearEquity,
+      uint256[6] memory priceArray,
       uint256 roundId,
       bool updated
     ) = priceCalculator.getUpdatedPrice(address(this), latestRoundId);
@@ -250,12 +245,12 @@ contract vault is Owned {
         latestRoundId
       ) =
       (
-        bullPrice,
-        bearPrice,
-        bullLiqEquity,
-        bearLiqEquity,
-        bullEquity,
-        bearEquity,
+        priceArray[0],
+        priceArray[1],
+        priceArray[2],
+        priceArray[3],
+        priceArray[4],
+        priceArray[5],
         roundId
       );
     }
@@ -321,6 +316,17 @@ contract vault is Owned {
   ///////////////////
   //ADMIN FUNCTIONS//
   ///////////////////
+
+  function setPriceCalculator(priceCalculatorInterface proxy) public onlyOwner() {
+    priceCalculator = proxy;
+  }
+  function setVaultHelper(vaultHelperInterface proxy) public onlyOwner() {
+    vaultHelper = proxy;
+  }
+  function registerAgg(address agg, address oracle) public onlyOwner() {
+    priceAggregatorInterface(agg).registerVaultAggregator(oracle);
+  }
+
   //One time use function to set token addresses. this can never be changed once set.
   //Cannot be included in constructor as vault must be deployed before tokens.
   function setTokens(address bearAddress, address bullAddress) public onlyOwner() {

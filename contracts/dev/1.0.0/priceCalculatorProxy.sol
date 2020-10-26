@@ -18,12 +18,7 @@ contract priceCalculatorProxy is Owned {
   view
   virtual
   returns(
-    uint256 rBullPrice,
-    uint256 rBearPrice,
-    uint256 rBullLiqEquity,
-    uint256 rBearLiqEquity,
-    uint256 rBullEquity,
-    uint256 rBearEquity,
+    uint256[6] memory,
     uint256 rRoundId,
     bool updated
   ) {
