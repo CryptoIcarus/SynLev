@@ -19,12 +19,12 @@ contract vault is Owned {
   using SafeMath for uint256;
 
   constructor() public {
-    priceAggregatorInterface(0).registerVaultAggregator(0);
+    priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
     //priceCalculator = priceCalculatorInterface(0);
     //vaultHelper = vaultHelperInterface(0);
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
-    ( , latestRoundId) = priceAggregatorInterface(0).priceRequest(address(this), latestRoundId);
+    ( , latestRoundId) = priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892).priceRequest(address(this), latestRoundId);
   }
 
   /////////////////////

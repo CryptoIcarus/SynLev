@@ -43,13 +43,13 @@ contract priceCalculator is Owned {
   function getUpdatedPrice(address vault, uint256 latestRoundId)
   public
   view
-  returns(uint256[6] memory, uint256, bool updated)
+  returns(uint256[6] memory latestPrice, uint256 rRoundId, bool updated)
   {
     //Requests price data from price aggregator proxy
     (
       int256[] memory priceData,
       uint256 roundId
-    ) = priceProxy.priceRequest(address(this), latestRoundId);
+    ) = priceProxy.priceRequest(vault, latestRoundId);
     vaultInterface ivault = vaultInterface(vault);
     address bull = ivault.getBullToken();
     address bear = ivault.getBearToken();
@@ -58,8 +58,9 @@ contract priceCalculator is Owned {
     //Only update if price data if price array contains 2 or more values
     //If there is no new price data pricedate array will have 0 length
     if(priceData.length > 0 && bullEquity != 0 && bearEquity != 0) {
-      (bullEquity, bearEquity) = priceCalcLoop(priceData, bullEquity, bearEquity, ivault);
-      return(equityToReturnData(bull, bear, bullEquity, bearEquity, ivault), roundId, true);
+      (uint256 rBullEquity, uint256 rBearEquity) = priceCalcLoop(priceData, bullEquity, bearEquity, ivault);
+      uint256[6] memory data = equityToReturnData(bull, bear, rBullEquity, rBearEquity, ivault);
+      return(data, roundId, true);
     }
     else {
       return(
@@ -74,6 +75,7 @@ contract priceCalculator is Owned {
       );
     }
   }
+
 
   function priceCalcLoop(
     int256[] memory priceData,
@@ -177,7 +179,7 @@ contract priceCalculator is Owned {
         bullLiqEquity,
         bearLiqEquity,
         bullEquity.sub(bullLiqEquity),
-        bullEquity.sub(bearLiqEquity)
+        bearEquity.sub(bearLiqEquity)
       ]);
   }
 
