@@ -23,7 +23,7 @@ contract vault is Owned {
     priceAggregator = priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892);
     //priceCalculator = priceCalculatorInterface(0);
     //vaultHelper = vaultHelperInterface(0);
-    //feeRecipientProxy = address(0);
+    //synStakingProxy = address(0);
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
     ( , latestRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
@@ -109,7 +109,7 @@ contract vault is Owned {
   priceAggregatorInterface  public priceAggregator;
   priceCalculatorInterface public priceCalculator;
   vaultHelperInterface public vaultHelper;
-  address payable public feeRecipientProxy;
+  address payable public synStakingProxy;
 
   //Fallback function
   receive() external payable {}
@@ -312,7 +312,7 @@ contract vault is Owned {
    * TODO Handle case if there are no LP
    */
   function payFees(uint256 amount) internal {
-    feeRecipientProxy.transfer(amount.div(2));
+    synStakingProxy.transfer(amount.div(2));
     liqFees += amount.sub(amount.div(2));
   }
 
@@ -363,8 +363,8 @@ contract vault is Owned {
   function setPriceAggregator(priceAggregatorInterface proxy) public onlyOwner() {
     priceAggregatorInterface = proxy;
   }
-  function setFeeRecipientProxy(address proxy) public onlyOwner() {
-    feeRecipientProxy = proxy;
+  function setsynStakingProxy(address proxy) public onlyOwner() {
+    synStakingProxy = proxy;
   }
 
   //One time use function to set token addresses. this can never be changed once set.
