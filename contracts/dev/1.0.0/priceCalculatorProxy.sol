@@ -23,7 +23,7 @@ contract priceCalculatorProxy is Owned {
     bool updated
   ) {
 
-    return(priceCalculator.getUpdatedPrice(vault, roundId));
+    return(priceCalculator.getUpdatedPrice(vault, latestRoundId));
   }
 
 
@@ -31,17 +31,17 @@ contract priceCalculatorProxy is Owned {
   //FOR TESTING ONLY. REMOVE ON PRODUCTION
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   function setVaultPriceAggregator(address account) public onlyOwner() {
-    vaultPriceAggregator = vaultPriceAggregatorInterface(account);
+    priceCalculator = priceCalculatorInterface(account);
   }
 
   function proposeVaultPriceAggregator(address account) public onlyOwner() {
-    vaultPriceAggregatorPropose = account;
+    priceCalculatorPropose = account;
     proposeTimestamp = block.timestamp;
   }
   function updateVaultAggregator() public {
-    if(vaultPriceAggregatorPropose != address(0) && proposeTimestamp + 1 days <= block.timestamp) {
-      vaultPriceAggregator = vaultPriceAggregatorInterface(vaultPriceAggregatorPropose);
-      vaultPriceAggregatorPropose = address(0);
+    if(priceCalculatorPropose != address(0) && proposeTimestamp + 1 days <= block.timestamp) {
+      priceCalculator = priceCalculatorInterface(priceCalculatorPropose);
+      priceCalculatorPropose = address(0);
     }
   }
 
