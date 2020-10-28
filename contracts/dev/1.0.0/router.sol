@@ -5,17 +5,9 @@
 pragma solidity >= 0.6.4;
 
 import './interfaces/IERC20.sol';
+import './interfaces/vaultInterface.sol';
 
-interface vaultInterface {
-  function tokenBuy(address token, address account) external;
-  function tokenSell(address token, address payable account) external;
-  function updatePrice() external returns(bool);
-  function getTokenPrice(address token) external view returns(uint256);
-  function getBearToken() external view returns(address);
-  function getBullToken() external view returns(address);
-}
-
-contract SynLevRouter {
+contract router {
 
   constructor() public { }
 
@@ -35,7 +27,7 @@ contract SynLevRouter {
     vaultInterface ivault = vaultInterface(vault);
     address token = ivault.getBullToken();
     ivault.updatePrice();
-    uint256 price = ivault.getTokenPrice(token);
+    uint256 price = ivault.getPrice(token);
     require(price >= minPrice && price <= maxPrice, 'SynLevRouter: TOKEN PRICE OUT OF RANGE');
     vault.transfer(address(this).balance);
     ivault.tokenBuy(token, msg.sender);
@@ -53,7 +45,7 @@ contract SynLevRouter {
     ivault.updatePrice();
 
     IERC20 itoken = IERC20(token);
-    uint256 price = ivault.getTokenPrice(token);
+    uint256 price = ivault.getPrice(token);
     require(price >= minPrice && price <= maxPrice, 'SynLevRouter: TOKEN PRICE OUT OF RANGE');
     require(itoken.transferFrom(msg.sender, vault, amount));
     ivault.tokenSell(token, msg.sender);
@@ -68,7 +60,7 @@ contract SynLevRouter {
     vaultInterface ivault = vaultInterface(vault);
     address token = ivault.getBearToken();
     ivault.updatePrice();
-    uint256 price = ivault.getTokenPrice(token);
+    uint256 price = ivault.getPrice(token);
     require(price >= minPrice && price <= maxPrice, 'SynLevRouter: TOKEN PRICE OUT OF RANGE');
     vault.transfer(address(this).balance);
     ivault.tokenBuy(token, msg.sender);
@@ -85,7 +77,7 @@ contract SynLevRouter {
     address token = ivault.getBearToken();
     ivault.updatePrice();
     IERC20 itoken = IERC20(token);
-    uint256 price = ivault.getTokenPrice(token);
+    uint256 price = ivault.getPrice(token);
     require(price >= minPrice && price <= maxPrice, 'SynLevRouter: TOKEN PRICE OUT OF RANGE');
     require(itoken.transferFrom(msg.sender, vault, amount));
     ivault.tokenSell(token, msg.sender);
