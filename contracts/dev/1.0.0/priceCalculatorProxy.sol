@@ -30,15 +30,15 @@ contract priceCalculatorProxy is Owned {
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   //FOR TESTING ONLY. REMOVE ON PRODUCTION
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  function setVaultPriceAggregator(address account) public onlyOwner() {
+  function setPriceCalculator(address account) public onlyOwner() {
     priceCalculator = priceCalculatorInterface(account);
   }
 
-  function proposeVaultPriceAggregator(address account) public onlyOwner() {
+  function proposePriceCalculator(address account) public onlyOwner() {
     priceCalculatorPropose = account;
     proposeTimestamp = block.timestamp;
   }
-  function updateVaultAggregator() public {
+  function updatePriceCalculator() public {
     if(priceCalculatorPropose != address(0) && proposeTimestamp + 1 days <= block.timestamp) {
       priceCalculator = priceCalculatorInterface(priceCalculatorPropose);
       priceCalculatorPropose = address(0);
