@@ -90,12 +90,7 @@ contract vaultHelper is Owned {
     address bull = ivault.getBullToken();
     address bear = ivault.getBearToken();
     if(ivault.getTotalLiqShares() == 0) {
-      return(
-        ivault.getLiqEquity(bull)
-        .add(ivault.getLiqEquity(bear))
-        .add(ivault.getLiqFees())
-        .add(1 ether)
-      );
+      return(1 ether);
     }
     else {
       return(
