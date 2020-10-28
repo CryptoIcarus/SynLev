@@ -42,10 +42,10 @@ contract vaultHelperProxy is Owned {
   view
   virtual
   returns(
-    uint256 rBullEquity,
-    uint256 rBearEquity,
-    uint256 rBullTokens,
-    uint256 rBearTokens
+    uint256 bullEquity,
+    uint256 bearEquity,
+    uint256 bullTokens,
+    uint256 bearTokens
   ) {
     return(vaultHelper.getLiqAddTokens(vault, eth));
   }
@@ -55,10 +55,11 @@ contract vaultHelperProxy is Owned {
   view
   virtual
   returns(
-    uint256 rBullEquity,
-    uint256 rBearEquity,
-    uint256 rBullTokens,
-    uint256 rBearTokens
+    uint256 bullEquity,
+    uint256 bearEquity,
+    uint256 bullTokens,
+    uint256 bearTokens,
+    uint256 feesPaid
   ) {
     return(vaultHelper.getLiqRemoveTokens(vault, eth));
   }

@@ -25,7 +25,11 @@ contract vaultHelper is Owned {
    * @return Bonus in ETH
    * TODO Change to simpler check as k factor no longer used to calc bonus
    */
-  function getBonus(address vault, address token, uint256 eth) public view returns(uint256) {
+  function getBonus(address vault, address token, uint256 eth)
+  public
+  view
+  returns(uint256)
+  {
     vaultInterface ivault = vaultInterface(vault);
     //Grab total equity of both tokens
     uint256 totaleth0 = ivault.getTotalEquity();
@@ -58,7 +62,11 @@ contract vaultHelper is Owned {
    * @param eth The amount of outgoing ETH
    * @return Penalty in ETH
    */
-  function getPenalty(address vault, address token, uint256 eth) public view returns(uint256) {
+  function getPenalty(address vault, address token, uint256 eth)
+  public
+  view
+  returns(uint256)
+  {
     vaultInterface ivault = vaultInterface(vault);
     //Grab total equity of both tokens
     uint256 totaleth0 = ivault.getTotalEquity();
@@ -85,7 +93,11 @@ contract vaultHelper is Owned {
    * @param eth The amount of outgoing ETH
    * @return Penalty in ETH
    */
-  function getSharePrice(address vault) public view returns(uint256) {
+  function getSharePrice(address vault)
+  public
+  view
+  returns(uint256)
+  {
     vaultInterface ivault = vaultInterface(vault);
     address bull = ivault.getBullToken();
     address bear = ivault.getBearToken();
@@ -112,12 +124,8 @@ contract vaultHelper is Owned {
   function getLiqAddTokens(address vault, uint256 eth)
   public
   view
-  returns(
-    uint256 rbullEquity,
-    uint256 rbearEquity,
-    uint256 rbullTokens,
-    uint256 rbearTokens
-  ) {
+  returns(uint256, uint256, uint256, uint256)
+  {
     vaultInterface ivault = vaultInterface(vault);
     address bull = ivault.getBullToken();
     address bear = ivault.getBearToken();
@@ -156,13 +164,8 @@ contract vaultHelper is Owned {
   function getLiqRemoveTokens(address vault, uint256 shares)
   public
   view
-  returns(
-    uint256 rbullEquity,
-    uint256 rbearEquity,
-    uint256 rbullToknes,
-    uint256 rbearTokens,
-    uint256 rfeesPaid
-  ) {
+  returns(uint256, uint256, uint256, uint256, uint256)
+  {
     vaultInterface ivault = vaultInterface(vault);
     address bull = ivault.getBullToken();
     address bear = ivault.getBearToken();
