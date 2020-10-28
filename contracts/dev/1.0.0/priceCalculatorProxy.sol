@@ -13,12 +13,12 @@ contract priceCalculatorProxy is Owned {
   address public priceCalculatorPropose;
   uint256 public proposeTimestamp;
 
-  function getUpdatedPrice(address vault, uint256 roundId)
+  function getUpdatedPrice(address vault, uint256 latestRoundId)
   public
   view
   virtual
   returns(
-    uint256[6] memory,
+    uint256[6] memory latestPrice,
     uint256 rRoundId,
     bool updated
   ) {

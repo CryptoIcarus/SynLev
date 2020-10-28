@@ -43,8 +43,11 @@ contract priceCalculator is Owned {
   function getUpdatedPrice(address vault, uint256 latestRoundId)
   public
   view
-  returns(uint256[6] memory latestPrice, uint256 rRoundId, bool updated)
-  {
+  returns(
+    uint256[6] memory latestPrice,
+    uint256 rRoundId,
+    bool updated
+  ) {
     //Requests price data from price aggregator proxy
     (
       int256[] memory priceData,
@@ -76,7 +79,6 @@ contract priceCalculator is Owned {
     }
   }
 
-
   function priceCalcLoop(
     int256[] memory priceData,
     uint256 bullEquity,
@@ -85,7 +87,7 @@ contract priceCalculator is Owned {
     )
     public
     view
-    returns(uint256, uint256)
+    returns(uint256 rBullEquity, uint256 rBearEquity)
     {
       uint256 multiplier = ivault.getMultiplier();
       uint256 totalEquity = ivault.getTotalEquity();
@@ -196,7 +198,12 @@ contract priceCalculator is Owned {
    * @return K factor
    * TODO Check if neccesary to do divides by 0 check
    */
-  function getKFactor(uint256 targetEquity, uint256 bullEquity, uint256 bearEquity, uint256 totalEquity)
+  function getKFactor(
+    uint256 targetEquity,
+    uint256 bullEquity,
+    uint256 bearEquity,
+    uint256 totalEquity
+  )
   public
   view
   returns(uint256) {

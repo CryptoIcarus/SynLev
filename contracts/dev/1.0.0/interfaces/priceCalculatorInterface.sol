@@ -1,6 +1,17 @@
 pragma solidity >= 0.6.6;
 
 interface priceCalculatorInterface {
+  function getUpdatedPrice(
+    address vault,
+    uint256 latestRoundId
+  )
+    external
+    view
+    returns(
+      uint256[6] memory latestPrice,
+      uint256 rRoundId,
+      bool updated
+  );
   function getKFactor(
     uint256 targetEquity,
     uint256 bullEquity,
@@ -9,18 +20,5 @@ interface priceCalculatorInterface {
   )
   external
   view
-  returns(
-    uint256 kFactor
-  );
-  function getUpdatedPrice(
-    address vault,
-    uint256 roundId
-  )
-    external
-    view
-    returns(
-      uint256[6] memory priceArray,
-      uint256 rRoundId,
-      bool updated
-  );
+  returns(uint256 kFactor);
 }
