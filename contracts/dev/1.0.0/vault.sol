@@ -20,11 +20,13 @@ contract vault is Owned {
 
   constructor() public {
     priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
+    priceAggregator = priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892);
     //priceCalculator = priceCalculatorInterface(0);
     //vaultHelper = vaultHelperInterface(0);
+    //feeRecipientProxy = address(0);
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
-    ( , latestRoundId) = priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892).priceRequest(address(this), latestRoundId);
+    ( , latestRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
   }
 
   /////////////////////
@@ -71,6 +73,16 @@ contract vault is Owned {
 
   modifier isActive() {
     require(active == true);
+    if(active == true && !priceAggregator.roundIdCheck()) {
+      updatePrice();
+    }
+    _;
+  }
+
+  modifier updateIfActive() {
+    if(active == true && !priceAggregator.roundIdCheck()) {
+      updatePrice();
+    }
     _;
   }
 
@@ -94,9 +106,10 @@ contract vault is Owned {
   mapping(address => uint256) private liqEquity;
   mapping(address => uint256) private userShares;
 
+  priceAggregatorInterface  public priceAggregator;
   priceCalculatorInterface public priceCalculator;
   vaultHelperInterface public vaultHelper;
-  address payable public feeRecipientProxy = address(0);
+  address payable public feeRecipientProxy;
 
   //Fallback function
   receive() external payable {}
@@ -121,7 +134,6 @@ contract vault is Owned {
     uint256 ethin = getDepositEquity();
     require(ethin > 0);
     require(token == bull || token == bear);
-    updatePrice();
     IERC20 itkn = IERC20(token);
     uint256 fees = ethin.mul(buyFee).div(10**9);
     uint256 buyeth = ethin.sub(fees);
@@ -145,12 +157,11 @@ contract vault is Owned {
    * Calculates resulting ETH from burned tokens. Pays fees, burns tokens, and
    * sends ETH.
    */
-  function tokenSell(address token, address payable account) public virtual {
+  function tokenSell(address token, address payable account) public virtual updateIfActive() {
     IERC20 itkn = IERC20(token);
     uint256 tokensToBurn = itkn.balanceOf(address(this));
     require(tokensToBurn > 0);
     require(token == bull || token == bear);
-    updatePrice();
     uint256 selleth = tokensToBurn.mul(price[token]).div(10**18);
     uint256 penalty = vaultHelper.getPenalty(address(this), token, selleth);
     uint256 fees = sellFee.mul(selleth.sub(penalty)).div(10**9);
@@ -173,9 +184,8 @@ contract vault is Owned {
    * creates rounding error. Calls updatePrice() then calls getLiqAddTokens()
    * to determine how many bull/bear to create.
    */
-  function addLiquidity(address account) public payable virtual {
+  function addLiquidity(address account) public payable virtual updateIfActive() {
     uint256 ethin = getDepositEquity();
-    updatePrice();
     (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens)
     = vaultHelper.getLiqAddTokens(address(this), ethin);
     uint256 sharePrice = vaultHelper.getSharePrice(address(this));
@@ -200,9 +210,8 @@ contract vault is Owned {
    * bull/bear tokens to remove.
    * TODO If LP is tokenized check deposit via IERC20 balanceOf()
    */
-  function removeLiquidity(uint256 shares) public virtual {
+  function removeLiquidity(uint256 shares) public virtual updateIfActive() {
     require(shares <= userShares[msg.sender]);
-    updatePrice();
     (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens, uint256 feesPaid)
     = vaultHelper.getLiqRemoveTokens(address(this), shares);
     uint256 sharePrice = vaultHelper.getSharePrice(address(this));
@@ -323,8 +332,11 @@ contract vault is Owned {
   function setVaultHelper(vaultHelperInterface proxy) public onlyOwner() {
     vaultHelper = proxy;
   }
-  function registerAgg(address agg, address oracle) public onlyOwner() {
-    priceAggregatorInterface(agg).registerVaultAggregator(oracle);
+  function setPriceAggregator(priceAggregatorInterface proxy) public onlyOwner() {
+    priceAggregatorInterface = proxy;
+  }
+  function setFeeRecipientProxy(address proxy) public onlyOwner() {
+    feeRecipientProxy = proxy;
   }
 
   //One time use function to set token addresses. this can never be changed once set.

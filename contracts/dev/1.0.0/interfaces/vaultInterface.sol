@@ -5,12 +5,12 @@ interface vaultInterface {
   function tokenSell(address token, address payable account) external;
   function addLiquidity(address account) external;
   function removeLiquidity(uint256 shares) external;
-  function updatePrice() external returns(bool);
+  function updatePrice() external;
 
   function getActive() external view returns(bool);
   function getMultiplier() external view returns(uint256);
-  function getBearToken() external view returns(address);
   function getBullToken() external view returns(address);
+  function getBearToken() external view returns(address);
   function getLatestRoundId() external view returns(uint256);
   function getPrice(address token) external view returns(uint256);
   function getEquity(address token) external view returns(uint256);

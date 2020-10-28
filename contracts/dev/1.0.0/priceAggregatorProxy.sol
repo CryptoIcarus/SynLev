@@ -25,6 +25,10 @@ contract priceAggregatorProxy is Owned {
     return(priceData, roundID);
   }
 
+  function roundIdCheck(address vault) public view returns(bool) {
+    return(priceAggregator.roundIdCheck(vault));
+  }
+
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   //FOR TESTING ONLY. REMOVE ON PRODUCTION
   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

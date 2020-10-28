@@ -9,4 +9,5 @@ interface priceAggregatorInterface {
   external
   view
   returns(int256[] memory, uint256);
+  function roundIdCheck(address vault) external view returns(bool);
 }
