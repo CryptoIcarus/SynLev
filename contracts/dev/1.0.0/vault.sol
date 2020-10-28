@@ -130,7 +130,11 @@ contract vault is Owned {
    * resulting tokens and fees. Sends fees and mints tokens.
    *
    */
-  function tokenBuy(address token, address account) public virtual isActive()  {
+  function tokenBuy(address token, address account)
+  public
+  virtual
+  isActive()
+  {
     uint256 ethin = getDepositEquity();
     require(ethin > 0);
     require(token == bull || token == bear);
@@ -157,7 +161,11 @@ contract vault is Owned {
    * Calculates resulting ETH from burned tokens. Pays fees, burns tokens, and
    * sends ETH.
    */
-  function tokenSell(address token, address payable account) public virtual updateIfActive() {
+  function tokenSell(address token, address payable account)
+  public
+  virtual
+  isActive()
+  {
     IERC20 itkn = IERC20(token);
     uint256 tokensToBurn = itkn.balanceOf(address(this));
     require(tokensToBurn > 0);
@@ -184,10 +192,19 @@ contract vault is Owned {
    * creates rounding error. Calls updatePrice() then calls getLiqAddTokens()
    * to determine how many bull/bear to create.
    */
-  function addLiquidity(address account) public payable virtual updateIfActive() {
+  function addLiquidity(address account)
+  public
+  payable
+  virtual
+  updateIfActive()
+  {
     uint256 ethin = getDepositEquity();
-    (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens)
-    = vaultHelper.getLiqAddTokens(address(this), ethin);
+    (
+      uint256 bullEquity,
+      uint256 bearEquity,
+      uint256 bullTokens,
+      uint256 bearTokens
+    ) = vaultHelper.getLiqAddTokens(address(this), ethin);
     uint256 sharePrice = vaultHelper.getSharePrice(address(this));
     uint256 resultingShares = ethin.mul(10**18).div(sharePrice);
     liqEquity[bull] = liqEquity[bull].add(bullEquity);
@@ -210,10 +227,19 @@ contract vault is Owned {
    * bull/bear tokens to remove.
    * TODO If LP is tokenized check deposit via IERC20 balanceOf()
    */
-  function removeLiquidity(uint256 shares) public virtual updateIfActive() {
+  function removeLiquidity(uint256 shares)
+  public
+  virtual
+  updateIfActive()
+  {
     require(shares <= userShares[msg.sender]);
-    (uint256 bullEquity, uint256 bearEquity, uint256 bullTokens, uint256 bearTokens, uint256 feesPaid)
-    = vaultHelper.getLiqRemoveTokens(address(this), shares);
+    (
+      uint256 bullEquity,
+      uint256 bearEquity,
+      uint256 bullTokens,
+      uint256 bearTokens,
+      uint256 feesPaid
+    ) = vaultHelper.getLiqRemoveTokens(address(this), shares);
     uint256 sharePrice = vaultHelper.getSharePrice(address(this));
     uint256 resultingEth = bullEquity.add(bearEquity).add(feesPaid);
     liqEquity[bull] = liqEquity[bull].sub(bullEquity);
@@ -326,6 +352,8 @@ contract vault is Owned {
   //ADMIN FUNCTIONS//
   ///////////////////
 
+
+  // TESTING ONLY REMOVE ON DEPLOYMENT
   function setPriceCalculator(priceCalculatorInterface proxy) public onlyOwner() {
     priceCalculator = proxy;
   }
