@@ -21,7 +21,7 @@ contract bear is IERC20, Owned {
     symbol = "BEAR";
     name = "3xBEARETH/USD";
     decimals = 18;
-    vault = 0x35AaC1318AEd1102DF06B994474Ed00611Ea6234;
+    vault = 0xFaa0D0bb167Aa8ddB17c2d4DF1f55Db85A5fB446;
   }
 
   modifier onlyVault {

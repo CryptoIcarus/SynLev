@@ -21,7 +21,7 @@ contract bull is IERC20, Owned {
     symbol = "BULL";
     name = "3xBULLETH/USD";
     decimals = 18;
-    vault = 0x35AaC1318AEd1102DF06B994474Ed00611Ea6234;
+    vault = 0xFaa0D0bb167Aa8ddB17c2d4DF1f55Db85A5fB446;
   }
 
   modifier onlyVault {

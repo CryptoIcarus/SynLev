@@ -19,11 +19,11 @@ contract vault is Owned {
   using SafeMath for uint256;
 
   constructor() public {
-    priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
-    priceAggregator = priceAggregatorInterface(0x223373e4976A07a8954413856b7e86498f898892);
-    //priceCalculator = priceCalculatorInterface(0);
-    //vaultHelper = vaultHelperInterface(0);
-    //synStakingProxy = address(0);
+    priceAggregatorInterface(0x7bB500ef8E3F4e1040ba6f0D95F83AD00afF5397).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
+    priceAggregator = priceAggregatorInterface(0x285FeB08593f6B48Dd0199Ea2D7fff46D173F6b9);
+    priceCalculator = priceCalculatorInterface(0x8AB8b8f663Fe0b8992a9A297e2047948776F9c62);
+    vaultHelper = vaultHelperInterface(0x7d8917CEB9176974F9948699CCE520AB3feB9eBc);
+    synStakingProxy = 0x51f230e46845bD603246746485122B08b16d629b;
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
     ( , latestRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
