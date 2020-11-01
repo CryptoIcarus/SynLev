@@ -19,14 +19,13 @@ contract vault is Owned {
   using SafeMath for uint256;
 
   constructor() public {
-    priceAggregatorInterface(0x7bB500ef8E3F4e1040ba6f0D95F83AD00afF5397).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
-    priceAggregator = priceAggregatorInterface(0x285FeB08593f6B48Dd0199Ea2D7fff46D173F6b9);
-    priceCalculator = priceCalculatorInterface(0x8AB8b8f663Fe0b8992a9A297e2047948776F9c62);
-    vaultHelper = vaultHelperInterface(0x7d8917CEB9176974F9948699CCE520AB3feB9eBc);
-    synStakingProxy = 0x51f230e46845bD603246746485122B08b16d629b;
+    priceAggregatorInterface(0x9f977f6B842b569bc886Baf9023f26d938381F73).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
+    priceAggregator = priceAggregatorInterface(0x0Ba247c936D12e995b19B8eFCbcC6Bf038299466);
+    priceCalculator = priceCalculatorInterface(0x0da7Aa82547AE8B4C07eBe24a60e6588ff05e98E);
+    vaultHelper = vaultHelperInterface(0xFa708E54088408D2B7Ce21d0B93d2DEE4f125504);
+    synStakingProxy = 0x4Dc8e89F86429655D1177B1F361cA6365E55f673;
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
-    ( , latestRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
   }
 
   /////////////////////
@@ -73,14 +72,14 @@ contract vault is Owned {
 
   modifier isActive() {
     require(active == true);
-    if(active == true && !priceAggregator.roundIdCheck()) {
+    if(active == true && !priceAggregator.roundIdCheck(address(this))) {
       updatePrice();
     }
     _;
   }
 
   modifier updateIfActive() {
-    if(active == true && !priceAggregator.roundIdCheck()) {
+    if(active == true && !priceAggregator.roundIdCheck(address(this))) {
       updatePrice();
     }
     _;
@@ -225,7 +224,6 @@ contract vault is Owned {
    * @dev Cannot be called by a router as LP shares are not currently tokenized.
    * Calls updatePrice() then calls getLiqRemoveTokens() to determine how many
    * bull/bear tokens to remove.
-   * TODO If LP is tokenized check deposit via IERC20 balanceOf()
    */
   function removeLiquidity(uint256 shares)
   public
@@ -264,6 +262,7 @@ contract vault is Owned {
   function updatePrice()
   public
   {
+    require(active == true);
     (
       uint256[6] memory priceArray,
       uint256 roundId,
@@ -352,21 +351,6 @@ contract vault is Owned {
   //ADMIN FUNCTIONS//
   ///////////////////
 
-
-  // TESTING ONLY REMOVE ON DEPLOYMENT
-  function setPriceCalculator(priceCalculatorInterface proxy) public onlyOwner() {
-    priceCalculator = proxy;
-  }
-  function setVaultHelper(vaultHelperInterface proxy) public onlyOwner() {
-    vaultHelper = proxy;
-  }
-  function setPriceAggregator(priceAggregatorInterface proxy) public onlyOwner() {
-    priceAggregatorInterface = proxy;
-  }
-  function setsynStakingProxy(address proxy) public onlyOwner() {
-    synStakingProxy = proxy;
-  }
-
   //One time use function to set token addresses. this can never be changed once set.
   //Cannot be included in constructor as vault must be deployed before tokens.
   function setTokens(address bearAddress, address bullAddress) public onlyOwner() {
@@ -375,8 +359,14 @@ contract vault is Owned {
     //Set initial price to .01 eth
     (price[bull], price[bear]) = (10**16, 10**16);
   }
-  function setActive(bool state) public onlyOwner() {
+  function setActive(bool state, uint256 roundId) public onlyOwner() {
     active = state;
+    if(roundId == 0) {
+      ( , latestRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
+    }
+    else {
+      latestRoundId == roundId;
+    }
   }
   //Fees in the form of 1 / 10^8
   function setBuyFee(uint256 amount) public onlyOwner() {

@@ -18,8 +18,6 @@ contract priceAggregator is Owned {
 
   struct vaultStruct{
     AggregatorInterface ref;
-    address refPropose;
-    uint proposeTimestamp;
   }
 
   mapping(address => vaultStruct) public refVault;     //Vault address => vaultStruct
@@ -72,23 +70,8 @@ contract priceAggregator is Owned {
   //to chainlink aggregator contract connections
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-  function testregister(address aggregator, address vault) public onlyOwner() {
-    refVault[vault].ref = AggregatorInterface(aggregator);
-  }
   //Can only be called by vault proxy, initiates pair
   function registerVaultAggregator(address aggregator) public {
     refVault[msg.sender].ref = AggregatorInterface(aggregator);
   }
-  //Admin only propose new chainlink aggregator address
-  function proposeVaultAggregator(address vault, address aggregator) public onlyOwner() {
-    refVault[vault].refPropose = aggregator;
-    refVault[vault].proposeTimestamp = block.timestamp;
-  }
-  function updateVaultAggregator(address vault) public {
-    if(refVault[vault].refPropose != address(0) && refVault[vault].proposeTimestamp + 7 days <= block.timestamp) {
-      refVault[msg.sender].ref = AggregatorInterface(refVault[vault].refPropose);
-      refVault[vault].refPropose = address(0);
-    }
-  }
-
 }

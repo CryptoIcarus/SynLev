@@ -35,10 +35,6 @@ contract priceCalculator is Owned {
    * via equity in ETH, not price to avoid rounding errors. Caculates price
    * based on the "losing side", then subracts from the other. Mitigates a
    * prefrence in rounding error to either bull or bear tokens.
-   * TODO Check if more gas efficient to create two separate functions to get k
-   * values.
-   * TODO Migrate grabbing current equity variables to after token equity check
-   * for potential gas savings
    */
   function getUpdatedPrice(address vault, uint256 latestRoundId)
   public

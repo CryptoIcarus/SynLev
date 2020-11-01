@@ -11,7 +11,6 @@ contract priceCalculatorProxy is Owned {
 
   priceCalculatorInterface public priceCalculator;
   address public priceCalculatorPropose;
-  uint256 public proposeTimestamp;
 
   function getUpdatedPrice(address vault, uint256 latestRoundId)
   public
@@ -27,22 +26,13 @@ contract priceCalculatorProxy is Owned {
   }
 
 
-  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  //FOR TESTING ONLY. REMOVE ON PRODUCTION
-  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  function setPriceCalculator(address account) public onlyOwner() {
-    priceCalculator = priceCalculatorInterface(account);
-  }
 
   function proposePriceCalculator(address account) public onlyOwner() {
     priceCalculatorPropose = account;
-    proposeTimestamp = block.timestamp;
   }
   function updatePriceCalculator() public {
-    if(priceCalculatorPropose != address(0) && proposeTimestamp + 1 days <= block.timestamp) {
-      priceCalculator = priceCalculatorInterface(priceCalculatorPropose);
-      priceCalculatorPropose = address(0);
-    }
+    priceCalculator = priceCalculatorInterface(priceCalculatorPropose);
+    priceCalculatorPropose = address(0);
   }
 
 }

@@ -11,7 +11,6 @@ contract priceAggregatorProxy is Owned {
 
   priceAggregatorInterface public priceAggregator;
   address public priceAggregatorPropose;
-  uint256 public proposeTimestamp;
 
   function priceRequest(address vault, uint256 lastUpdated)
   public
@@ -29,22 +28,13 @@ contract priceAggregatorProxy is Owned {
     return(priceAggregator.roundIdCheck(vault));
   }
 
-  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  //FOR TESTING ONLY. REMOVE ON PRODUCTION
-  //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  function setPriceAggregator(address account) public onlyOwner() {
-    priceAggregator = priceAggregatorInterface(account);
-  }
 
   function proposeVaultPriceAggregator(address account) public onlyOwner() {
     priceAggregatorPropose = account;
-    proposeTimestamp = block.timestamp;
   }
   function updateVaultAggregator() public {
-    if(priceAggregatorPropose != address(0) && proposeTimestamp + 1 days <= block.timestamp) {
-      priceAggregator = priceAggregatorInterface(priceAggregatorPropose);
-      priceAggregatorPropose = address(0);
-    }
+    priceAggregator = priceAggregatorInterface(priceAggregatorPropose);
+    priceAggregatorPropose = address(0);
   }
 
 }

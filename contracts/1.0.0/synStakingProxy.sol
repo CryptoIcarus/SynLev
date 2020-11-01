@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV FEES PROXY CONTRACT V 0.1.0
+//SYNLEV FEES PROXY CONTRACT V 1.0.0
 //////////////////////////
 
 pragma solidity >= 0.6.4;

@@ -23,7 +23,6 @@ contract vaultHelper is Owned {
    * @param token The selected bull or bear token
    * @param eth The amount of ETH to be added
    * @return Bonus in ETH
-   * TODO Change to simpler check as k factor no longer used to calc bonus
    */
   function getBonus(address vault, address token, uint256 eth)
   public
