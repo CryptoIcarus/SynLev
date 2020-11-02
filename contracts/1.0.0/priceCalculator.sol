@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV VAULT CONTRACT V 0.1.0
+//SYNLEV Price Calculator Contract V 1.0.0
 //////////////////////////
 
 pragma solidity >= 0.6.6;
@@ -18,7 +18,7 @@ contract priceCalculator is Owned {
   constructor() public {
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
-    priceProxy = priceAggregatorInterface(0);
+    priceProxy = priceAggregatorInterface(0x73f27200093b74B3d21ff4df63E14a9E3fB85cd8);
   }
 
   uint256 public constant uSmallFactor = 10**9;
@@ -192,7 +192,6 @@ contract priceCalculator is Owned {
    * @param bearEquity The total equity bear tokens
    * @param totalEquity The total equity of bull and bear tokens
    * @return K factor
-   * TODO Check if neccesary to do divides by 0 check
    */
   function getKFactor(
     uint256 targetEquity,

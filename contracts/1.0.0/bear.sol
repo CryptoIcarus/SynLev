@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV BEAR CONTRACT V 0.1.0
+//SYNLEV BEAR CONTRACT V 1.0.0
 //////////////////////////
 
 //THIS IS STANDARD OPENZEPLIN ERC-20 CONTRACT WITH BURN/MINT RESTRICTED TO VAULT
@@ -21,7 +21,7 @@ contract bear is IERC20, Owned {
     symbol = "BEAR";
     name = "3xBEARETH/USD";
     decimals = 18;
-    vault = 0x183CfcA311E2874D3bB4AA713C6eda013E2e1179;
+    vault = 0xAae6ea9b2884bf263eDf6e61fCdCa2EA8D807008;
   }
 
   modifier onlyVault {

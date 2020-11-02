@@ -19,11 +19,11 @@ contract vault is Owned {
   using SafeMath for uint256;
 
   constructor() public {
-    priceAggregatorInterface(0x9f977f6B842b569bc886Baf9023f26d938381F73).registerVaultAggregator(0x9326BFA02ADD2366b30bacB125260Af641031331);
-    priceAggregator = priceAggregatorInterface(0x0Ba247c936D12e995b19B8eFCbcC6Bf038299466);
-    priceCalculator = priceCalculatorInterface(0x0da7Aa82547AE8B4C07eBe24a60e6588ff05e98E);
-    vaultHelper = vaultHelperInterface(0xFa708E54088408D2B7Ce21d0B93d2DEE4f125504);
-    synStakingProxy = 0x4Dc8e89F86429655D1177B1F361cA6365E55f673;
+    priceAggregatorInterface(0x7196545d854D03D9c87B7588F6D9e1e42D876E95).registerVaultAggregator(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
+    priceAggregator = priceAggregatorInterface(0x73f27200093b74B3d21ff4df63E14a9E3fB85cd8);
+    priceCalculator = priceCalculatorInterface(0xf4c56485A09388DbdcB01056E76A7B5bf7f5F574);
+    vaultHelper = vaultHelperInterface(0xE0d6b68403D32Dd659E452DB880393Df15fA00F2);
+    synStakingProxy = 0x0070F3e1147c03a1Bb0caF80035B7c362D312119;
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
   }
@@ -307,8 +307,7 @@ contract vault is Owned {
   /*
    * @notice Pays half fees to SYN stakers and half to LP
    * @param _amount Fees to be paid in ETH
-   * @dev Only called by tokenBuy() nad tokenSell()
-   * TODO Handle case if there are no LP
+   * @dev Only called by tokenBuy() and tokenSell()
    */
   function payFees(uint256 amount) internal {
     synStakingProxy.transfer(amount.div(2));
