@@ -9,8 +9,18 @@ import './interfaces/vaultHelperInterface.sol';
 
 contract vaultHelperProxy is Owned {
 
+  constructor() public {
+    vaultHelper = vaultHelperInterface();
+    proposeDelay = 7 days;
+  }
+
   vaultHelperInterface public vaultHelper;
   address public vaultHelperPropose;
+  address public vaultHelperProposeTimestamp;
+
+  uint256 public proposeDelay;
+  uint256 public proposeDelayPropose;
+  uint256 public proposeDelayTimestamp;
 
   function getBonus(address vault, address token, uint256 eth)
   public
@@ -63,12 +73,25 @@ contract vaultHelperProxy is Owned {
     return(vaultHelper.getLiqRemoveTokens(vault, eth));
   }
 
-  function proposeVaultPriceAggregator(address account) public onlyOwner() {
+  function proposeVaultHelper(address account) public onlyOwner() {
     vaultHelperPropose = account;
+    vaultHelperProposeTimestamp = block.timestamp;
   }
-  function updateVaultAggregator() public{
+  function updateVaultHelper() public onlyOwner() {
+    require(vaultHelperPropose != 0);
+    require(vaultHelperProposeTimestamp + proposeDelay <= block.timestamp);
     vaultHelper = vaultHelperInterface(vaultHelperPropose);
     vaultHelperPropose = address(0);
   }
 
+  function proposeProposeDelay(uint256 delay) public onlyOwner() {
+    proposeDelayPropose = delay;
+    proposeDelayTimestamp = block.timestamp;
+  }
+  function updateProposeDelay() public onlyOwner() {
+    require(proposeDelayPropose != 0);
+    require(proposeDelayTimestamp + proposeDelay <= block.timestamp);
+    proposeDelay = proposeDelayPropose;
+    proposeDelayPropose = 0;
+  }
 }
