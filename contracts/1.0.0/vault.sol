@@ -359,13 +359,16 @@ contract vault is Owned {
     (price[bull], price[bear]) = (10**16, 10**16);
   }
   function setActive(bool state, uint256 roundId) public onlyOwner() {
+    if(roundId != 0) {
+      advanceRoundId(roundId);
+    }
     active = state;
-    if(roundId == 0) {
-      ( , latestRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
-    }
-    else {
-      latestRoundId == roundId;
-    }
+  }
+  function advanceRoundId(uint256 roundId) public onlyOwner() {
+    require(active == false);
+    require(roundId > latestRoundId);
+    ( , uint256 lastRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
+    latestRoundId = lastRoundId >= roundId ? roundId : latestRoundId;
   }
   //Fees in the form of 1 / 10^8
   function setBuyFee(uint256 amount) public onlyOwner() {
