@@ -10,13 +10,12 @@ import './interfaces/priceAggregatorInterface.sol';
 contract priceAggregatorProxy is Owned {
 
   constructor() public {
-    priceAggregator = priceAggregatorInterface();
-    proposeDelay = 7 days;
+    proposeDelay = 1;
   }
 
   priceAggregatorInterface public priceAggregator;
   address public priceAggregatorPropose;
-  address public priceAggregatorProposeTimestamp;
+  uint256 public priceAggregatorProposeTimestamp;
 
   uint256 public proposeDelay;
   uint256 public proposeDelayPropose;
@@ -44,7 +43,7 @@ contract priceAggregatorProxy is Owned {
     priceAggregatorProposeTimestamp = block.timestamp;
   }
   function updateVaultPriceAggregator() public onlyOwner() {
-    require(priceAggregatorPropose != 0);
+    require(priceAggregatorPropose != address(0));
     require(priceAggregatorProposeTimestamp + proposeDelay <= block.timestamp);
     priceAggregator = priceAggregatorInterface(priceAggregatorPropose);
     priceAggregatorPropose = address(0);

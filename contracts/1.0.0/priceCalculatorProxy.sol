@@ -10,8 +10,7 @@ import './interfaces/priceCalculatorInterface.sol';
 contract priceCalculatorProxy is Owned {
 
   constructor() public {
-    priceCalculator = priceCalculatorInterface();
-    proposeDelay = 7 days;
+    proposeDelay = 1;
   }
 
   priceCalculatorInterface public priceCalculator;
@@ -40,7 +39,7 @@ contract priceCalculatorProxy is Owned {
     priceCalculatorProposeTimestamp = block.timestamp;
   }
   function updatePriceCalculator() public onlyOwner() {
-    require(priceCalculatorPropose != 0);
+    require(priceCalculatorPropose != address(0));
     require(priceCalculatorProposeTimestamp + proposeDelay <= block.timestamp);
     priceCalculator = priceCalculatorInterface(priceCalculatorPropose);
     priceCalculatorPropose = address(0);

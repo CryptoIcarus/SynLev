@@ -18,8 +18,7 @@ contract priceCalculator is Owned {
   constructor() public {
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
-    priceAggregator = priceAggregatorInterface(0x73f27200093b74B3d21ff4df63E14a9E3fB85cd8);
-    proposeDelay = 7 days;
+    proposeDelay = 1;
   }
 
   uint256 public constant uSmallFactor = 10**9;
@@ -29,7 +28,7 @@ contract priceCalculator is Owned {
   uint256 public kControl;
   priceAggregatorInterface public priceAggregator;
   address public priceAggregatorPropose;
-  address public priceAggregatorProposeTimestamp;
+  uint256 public priceAggregatorProposeTimestamp;
 
   uint256 public proposeDelay;
   uint256 public proposeDelayPropose;
@@ -237,7 +236,7 @@ contract priceCalculator is Owned {
     priceAggregatorProposeTimestamp = block.timestamp;
   }
   function updateVaultPriceAggregator() public onlyOwner() {
-    require(priceAggregatorPropose != 0);
+    require(priceAggregatorPropose != address(0));
     require(priceAggregatorProposeTimestamp + proposeDelay <= block.timestamp);
     priceAggregator = priceAggregatorInterface(priceAggregatorPropose);
     priceAggregatorPropose = address(0);

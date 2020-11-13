@@ -10,13 +10,12 @@ import './interfaces/vaultHelperInterface.sol';
 contract vaultHelperProxy is Owned {
 
   constructor() public {
-    vaultHelper = vaultHelperInterface();
-    proposeDelay = 7 days;
+    proposeDelay = 1;
   }
 
   vaultHelperInterface public vaultHelper;
   address public vaultHelperPropose;
-  address public vaultHelperProposeTimestamp;
+  uint256 public vaultHelperProposeTimestamp;
 
   uint256 public proposeDelay;
   uint256 public proposeDelayPropose;
@@ -78,7 +77,7 @@ contract vaultHelperProxy is Owned {
     vaultHelperProposeTimestamp = block.timestamp;
   }
   function updateVaultHelper() public onlyOwner() {
-    require(vaultHelperPropose != 0);
+    require(vaultHelperPropose != address(0));
     require(vaultHelperProposeTimestamp + proposeDelay <= block.timestamp);
     vaultHelper = vaultHelperInterface(vaultHelperPropose);
     vaultHelperPropose = address(0);
