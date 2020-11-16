@@ -20,10 +20,10 @@ contract vault is Owned {
 
   constructor() public {
     priceAggregatorInterface(0x7196545d854D03D9c87B7588F6D9e1e42D876E95).registerVaultAggregator(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
-    priceAggregator = priceAggregatorInterface(0x73f27200093b74B3d21ff4df63E14a9E3fB85cd8);
-    priceCalculator = priceCalculatorInterface(0xf4c56485A09388DbdcB01056E76A7B5bf7f5F574);
-    vaultHelper = vaultHelperInterface(0xE0d6b68403D32Dd659E452DB880393Df15fA00F2);
-    synStakingProxy = 0x0070F3e1147c03a1Bb0caF80035B7c362D312119;
+    priceAggregator = priceAggregatorInterface();
+    priceCalculator = priceCalculatorInterface();
+    vaultHelper = vaultHelperInterface();
+    synStakingProxy = 0xD35B6b2d270C7eb9fC8470eaB85e1Bc30119d2a7;
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
   }
