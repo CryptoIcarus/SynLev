@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV Vault Helper contract V 1.0.0
+//SYNLEV Vault Helper contract V 1.1
 //////////////////////////
 
 pragma solidity >= 0.6.4;
@@ -11,6 +11,7 @@ contract vaultHelperProxy is Owned {
 
   constructor() public {
     proposeDelay = 1;
+    vaultHelper = vaultHelperInterface(0x4A754941ccE5e611Bc89C77F2Dd684c420acC5D0);
   }
 
   vaultHelperInterface public vaultHelper;

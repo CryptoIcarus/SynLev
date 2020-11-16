@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV price calculator proxy V 1.0.0
+//SYNLEV price calculator proxy V 1.1
 //////////////////////////
 
 pragma solidity >= 0.6.4;

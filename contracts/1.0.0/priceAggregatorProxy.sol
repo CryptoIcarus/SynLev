@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV price aggregator proxy contract V 1.0.0
+//SYNLEV price aggregator proxy contract V 1.1
 //////////////////////////
 
 pragma solidity >= 0.6.4;
@@ -11,6 +11,7 @@ contract priceAggregatorProxy is Owned {
 
   constructor() public {
     proposeDelay = 1;
+    priceAggregator = priceAggregatorInterface(0x7196545d854D03D9c87B7588F6D9e1e42D876E95);
   }
 
   priceAggregatorInterface public priceAggregator;

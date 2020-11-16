@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV Price Calculator Contract V 1.0.0
+//SYNLEV Price Calculator Contract V 1.1
 //////////////////////////
 
 pragma solidity >= 0.6.6;
@@ -19,6 +19,7 @@ contract priceCalculator is Owned {
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
     proposeDelay = 1;
+    priceAggregator = priceAggregatorInterface(0x7196545d854D03D9c87B7588F6D9e1e42D876E95);
   }
 
   uint256 public constant uSmallFactor = 10**9;
