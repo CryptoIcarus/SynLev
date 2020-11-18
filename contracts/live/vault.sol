@@ -20,10 +20,10 @@ contract vault is Owned {
 
   constructor() public {
     priceAggregatorInterface(0x7196545d854D03D9c87B7588F6D9e1e42D876E95).registerVaultAggregator(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
-    priceAggregator = priceAggregatorInterface();
-    priceCalculator = priceCalculatorInterface();
-    vaultHelper = vaultHelperInterface();
-    synStakingProxy = 0xD35B6b2d270C7eb9fC8470eaB85e1Bc30119d2a7;
+    priceAggregator = priceAggregatorInterface(0xb658E8680c1E1f148fb09cDbB3Bd0d58F9c14c00);
+    priceCalculator = priceCalculatorInterface(0x80D129A01879422EB102c47Ed32DC6E8B123D05f);
+    vaultHelper = vaultHelperInterface(0x70873daAa742bEA6D0EDf03f4f85c615983C01D7);
+    synStakingProxy = 0x0070F3e1147c03a1Bb0caF80035B7c362D312119;
     buyFee = 4 * 10**6;
     sellFee = 4 * 10**6;
   }
@@ -368,7 +368,7 @@ contract vault is Owned {
     require(active == false);
     require(roundId > latestRoundId);
     ( , uint256 lastRoundId) = priceAggregator.priceRequest(address(this), latestRoundId);
-    latestRoundId = lastRoundId >= roundId ? roundId : latestRoundId;
+    latestRoundId = lastRoundId >= roundId ? roundId : lastRoundId;
   }
   //Fees in the form of 1 / 10^8
   function setBuyFee(uint256 amount) public onlyOwner() {

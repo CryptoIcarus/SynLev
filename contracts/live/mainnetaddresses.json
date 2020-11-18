@@ -1,14 +1,14 @@
 {
 "ETH/USD price feed": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
-"vault": "",
+"vault": "0xFf40827Ee1c4Eb6052044101E1C6E28DBe1440e3",
 "priceAggregator": "0x7196545d854D03D9c87B7588F6D9e1e42D876E95",
-"priceAggregatorProxy": "",
-"priceCalculator": "",
-"priceCalculatorProxy": "",
+"priceAggregatorProxy": "0xb658E8680c1E1f148fb09cDbB3Bd0d58F9c14c00",
+"priceCalculator": "0xaEc85eC5D1660f25DD3B8eda0DDBcb70115039F6",
+"priceCalculatorProxy": "0x80D129A01879422EB102c47Ed32DC6E8B123D05f",
 "vaultHelper": "0x4A754941ccE5e611Bc89C77F2Dd684c420acC5D0",
-"vaultHelperProxy": "",
-"router": "",
+"vaultHelperProxy": "0x70873daAa742bEA6D0EDf03f4f85c615983C01D7",
+"router": "0x2A77A4Ce668484b5361A4525038a1c12d561ACd5",
 "synStakingProxy": "0x0070F3e1147c03a1Bb0caF80035B7c362D312119",
-"3xBULLETH/USD": "",
-"3xBEARETH/USD": ""
+"3xBULLETH/USD": "0xDdDe72a5431a2e73D871431ba79d9F45915F3728",
+"3xBEARETH/USD": "0x2bAb675D19EB672268d04D7d593B935b76f48D26"
 }
