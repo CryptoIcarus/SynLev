@@ -13,7 +13,8 @@ contract priceAggregator is Owned {
   using SafeMath for uint256;
 
   constructor() public {
-
+    refVault[0xFf40827Ee1c4Eb6052044101E1C6E28DBe1440e3].ref =
+      AggregatorInterface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
   }
 
   struct vaultStruct{
@@ -31,11 +32,20 @@ contract priceAggregator is Owned {
   {
     uint256 currentRound = refVault[vault].ref.latestRound();
     if(currentRound > lastUpdated) {
-      uint256 pricearrayLength = currentRound.add(1).sub(lastUpdated);
+      int256 initialPrice = refVault[vault].ref.getAnswer(lastUpdated);
+      uint256 pricearrayLength;
+      uint16 phaseId = refVault[vault].ref.phaseId();
+      if(uint16(lastUpdated >> 64) < phaseId) {
+        lastUpdated = uint256(phaseId) * 2**64 + 1;
+        pricearrayLength = currentRound.add(2).sub(lastUpdated);
+      }
+      else {
+        pricearrayLength = currentRound.add(1).sub(lastUpdated);
+      }
       pricearrayLength = pricearrayLength > maxUpdates ?
       maxUpdates : pricearrayLength;
       int256[] memory pricearray = new int256[] (pricearrayLength);
-      pricearray[0] = refVault[vault].ref.getAnswer(lastUpdated);
+      pricearray[0] = initialPrice;
       for(uint i = 1; i < pricearrayLength; i++) {
         pricearray[pricearrayLength.sub(i)] =
         refVault[vault].ref.getAnswer(currentRound.add(1).sub(i));
