@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV Price Calculator Contract V 1.1
+//SYNLEV Price Calculator Contract V 1.2
 //////////////////////////
 
 pragma solidity >= 0.6.6;
