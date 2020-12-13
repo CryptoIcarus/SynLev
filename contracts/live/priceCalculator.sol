@@ -74,8 +74,8 @@ contract priceCalculator is Owned {
         ivault.getPrice(bear),
         ivault.getLiqEquity(bull),
         ivault.getLiqEquity(bear),
-        ivault.getTokenEquity(bull),
-        ivault.getTokenEquity(bear)],
+        ivault.getEquity(bull),
+        ivault.getEquity(bear)],
         roundId,
         false
       );
