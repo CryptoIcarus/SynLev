@@ -131,7 +131,7 @@ contract priceCalculator is Owned {
           //Bullish movement, calc equity from the perspective of bear
           //Same process as above. only from bear perspective
           else if(priceData[i-1] < priceData[i]) {
-            if(priceData[i] == 0) priceData[i] = 1;
+            if(priceData[i-1] == 0) priceData[i-1] = 1;
 
             signedPriceDelta = priceData[i].sub(priceData[i-1]);
             signedPriceDelta = signedPriceDelta.mul(smallFactor);
