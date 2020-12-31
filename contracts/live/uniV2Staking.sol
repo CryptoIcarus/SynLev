@@ -40,21 +40,25 @@ contract uniV2Staking is Owned {
   uint256 public feesTotal;
 
   event feesIn(
-      uint256 ethIn,
-      uint256 fpuTotal,
-      uint256 feesTotal
+    uint256 ethIn,
+    uint256 fpuTotal,
+    uint256 feesTotal
   );
   event userStakeEvent(
-      address account,
-      uint256 amount
+    address account,
+    uint256 amount
   );
   event userUnStakeEvent(
-      address account,
-      uint256 amount
+    address account,
+    uint256 amount
   );
   event userClaimEvent(
-      address account,
-      uint256 ethOut
+    address account,
+    uint256 ethOut
+  );
+  event newSynStaking(
+    address oldSynStaking,
+    address newSynStaking
   );
 
   constructor() public {
@@ -62,7 +66,7 @@ contract uniV2Staking is Owned {
     // SYN-ETH pair https://info.uniswap.org/pair/0xdf27a38946a1ace50601ef4e10f07a9cc90d7231
     uniV2Token = IERC20(0xdF27A38946a1AcE50601Ef4e10f07A9CC90d7231);
     // Syn Staking impl
-    synStaking = synStakingInterface(0xf21c4F3a748F38A0B244f649d19FdcC55678F576);
+    setSynStaking(0xf21c4F3a748F38A0B244f649d19FdcC55678F576);
   }
 
   // Allow this contract to receive ETH
@@ -178,6 +182,11 @@ contract uniV2Staking is Owned {
   // ---- Owner only ----
 
   function setSynStaking(address _synStaking) public onlyOwner() {
+    address oldSynStaking = address(synStaking);
     synStaking = synStakingInterface(_synStaking);
+    emit newSynStaking(
+      oldSynStaking,
+      _synStaking
+    );
   }
 }
