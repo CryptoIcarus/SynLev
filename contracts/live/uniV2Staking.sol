@@ -6,16 +6,16 @@ import './interfaces/IERC20.sol';
 
 interface synStakingInterface {
   // Stakes SYN
-  function stake(uint256 amount) public;
+  function stake(uint256 amount) external;
   // Unstakes SYN
-  function unstake(uint256 amount) public;
+  function unstake(uint256 amount) external;
   // Claims any ETH owed to msg.sender for staking SYN
-  function claimReward() public;
+  function claimReward() external;
   // Emergency removes staked SYN
-  function emergencyRemove(uint256 amount) public;
+  function emergencyRemove(uint256 amount) external;
 }
 
-contract synStaking is Owned {
+contract uniV2Staking is Owned {
   using SafeMath for uint256;
 
   struct userStakeStruct {
@@ -58,9 +58,9 @@ contract synStaking is Owned {
   );
 
   constructor() public {
-    synToken = IERC20(0x1695936d6a953df699c38ca21c2140d497c08bd9);
+    synToken = IERC20(0x1695936d6a953df699C38CA21c2140d497C08BD9);
     // SYN-ETH pair https://info.uniswap.org/pair/0xdf27a38946a1ace50601ef4e10f07a9cc90d7231
-    uniV2Token = IERC20(0xdf27a38946a1ace50601ef4e10f07a9cc90d7231);
+    uniV2Token = IERC20(0xdF27A38946a1AcE50601Ef4e10f07A9CC90d7231);
     // Syn Staking impl
     synStaking = synStakingInterface(0xf21c4F3a748F38A0B244f649d19FdcC55678F576);
   }
@@ -144,6 +144,8 @@ contract synStaking is Owned {
     // To cover the case of someone accidentally sending SYN directly to this contract.
     // It'll get staked and owned by whoever calls stakeSyn first
     uint synAmountToStake = synToken.balanceOf(address(this)).sub(synBalanceBefore);
+    // Now allow synStaking to transfer our synAmountToStake SYN into synStaking
+    synToken.approve(address(synStaking), synAmountToStake);
     // Stake it
     synStaking.stake(synAmountToStake);
     // Record that sender has staked syn via this contract
@@ -159,7 +161,7 @@ contract synStaking is Owned {
     // Record that sender has unstaked syn via this contract
     stakedSyn[msg.sender] = stakedSyn[msg.sender].sub(amount);
     // Transfer the syn that was unstaked from this contract to the sender
-    require(synToken.transferFrom(address(this), msg.sender, amount));
+    require(synToken.transfer(msg.sender, amount));
   }
 
   function emergencyRemoveSyn(uint amount) external {
