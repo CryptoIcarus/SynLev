@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////
-//SYNLEV PRICE AGGREGATOR CONTRACT V 1.1
+//SYNLEV PRICE AGGREGATOR CONTRACT V 1.2
 //////////////////////////
 
 pragma solidity >= 0.6.6;
