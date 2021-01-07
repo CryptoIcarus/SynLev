@@ -15,7 +15,7 @@ contract priceAggregator is Owned {
   using SignedSafeMath for int256;
 
   constructor() public {
-    standardUpdateWindow = 5;
+    standardUpdateWindow = 10;
     refVault[0xFf40827Ee1c4Eb6052044101E1C6E28DBe1440e3].ref =
       AggregatorV2V3Interface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
     refVault[0xA81f8460dE4008577e7e6a17708102392f9aD92D].ref =
