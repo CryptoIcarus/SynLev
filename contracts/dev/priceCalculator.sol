@@ -5,11 +5,11 @@
 pragma solidity >= 0.6.6;
 
 import './ownable.sol';
-import './libraries/SafeMath.sol';
-import './libraries/SignedSafeMath.sol';
-import './interfaces/IERC20.sol';
-import './interfaces/vaultInterface.sol';
-import './interfaces/priceAggregatorInterface.sol';
+import './SafeMath.sol';
+import './SignedSafeMath.sol';
+import './IERC20.sol';
+import './vaultInterface.sol';
+import './priceAggregatorInterface.sol';
 
 contract priceCalculator is Owned {
   using SafeMath for uint256;
@@ -19,7 +19,7 @@ contract priceCalculator is Owned {
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
     proposeDelay = 1;
-    priceAggregator = priceAggregatorInterface(0x7196545d854D03D9c87B7588F6D9e1e42D876E95);
+    priceAggregator = priceAggregatorInterface(0x2af1dD18196cc77E000bd0aB72E9d7B38b8D7eb1);
   }
 
   uint256 public constant uSmallFactor = 10**9;
