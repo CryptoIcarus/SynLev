@@ -18,8 +18,9 @@ contract priceCalculator is Owned {
   constructor() public {
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
-    proposeDelay = 1;
-    priceAggregator = priceAggregatorInterface(0x2af1dD18196cc77E000bd0aB72E9d7B38b8D7eb1);
+    proposeDelay = 2 days;
+    proposeDelayPropose = 2 days;
+    priceAggregator = priceAggregatorInterface(0x717584a1DC53DAFddE10b9819601A7082536E79e);
   }
 
   uint256 public constant uSmallFactor = 10**9;
@@ -101,9 +102,9 @@ contract priceCalculator is Owned {
       uint256 pricedelta;
 
       if(priceData[0] != priceData[1]) {
-        //Bearish movement, calc equity from the perspective of bull
         //Treats 0 price value as 1, 0 causes divides by 0 error
         if(priceData[0] == 0) priceData[0] = 1;
+        //Bearish movement, calc equity from the perspective of bull
         if(priceData[0] > priceData[1]) {
           //Gets price change in absolute terms.
           signedPriceDelta = priceData[0].sub(priceData[1]);
@@ -169,7 +170,7 @@ contract priceCalculator is Owned {
         .mul(IERC20(bull).totalSupply())
         .div(1 ether);
       uint256 bearTokenEquity =
-        bullPrice
+        bearPrice
         .mul(IERC20(bear).totalSupply())
         .div(1 ether);
 
