@@ -1,15 +1,15 @@
 //////////////////////////////////////////////////
-//SYNLEV Price Calculator Contract V 1.2
+//SYNLEV Price Calculator Contract V 1.3
 //////////////////////////
 
 pragma solidity >= 0.6.6;
 
 import './ownable.sol';
-import './libraries/SafeMath.sol';
-import './libraries/SignedSafeMath.sol';
-import './interfaces/IERC20.sol';
-import './interfaces/vaultInterface.sol';
-import './interfaces/priceAggregatorInterface.sol';
+import './SafeMath.sol';
+import './SignedSafeMath.sol';
+import './IERC20.sol';
+import './vaultInterface.sol';
+import './priceAggregatorInterface.sol';
 
 contract priceCalculator is Owned {
   using SafeMath for uint256;
@@ -18,8 +18,9 @@ contract priceCalculator is Owned {
   constructor() public {
     lossLimit = 9 * 10**8;
     kControl = 15 * 10**8;
-    proposeDelay = 1;
-    priceAggregator = priceAggregatorInterface(0x7196545d854D03D9c87B7588F6D9e1e42D876E95);
+    proposeDelay = 2 days;
+    proposeDelayPropose = 2 days;
+    priceAggregator = priceAggregatorInterface(0x717584a1DC53DAFddE10b9819601A7082536E79e);
   }
 
   uint256 public constant uSmallFactor = 10**9;
@@ -64,7 +65,7 @@ contract priceCalculator is Owned {
     //Only update if price data if price array contains 2 or more values
     //If there is no new price data pricedate array will have 0 length
     if(priceData.length > 0 && bullEquity != 0 && bearEquity != 0) {
-      (uint256 rBullEquity, uint256 rBearEquity) = priceCalcLoop(priceData, bullEquity, bearEquity, ivault);
+      (uint256 rBullEquity, uint256 rBearEquity) = priceCalc(priceData, bullEquity, bearEquity, ivault);
       uint256[6] memory data = equityToReturnData(bull, bear, rBullEquity, rBearEquity, ivault);
       return(data, roundId, true);
     }
@@ -82,7 +83,7 @@ contract priceCalculator is Owned {
     }
   }
 
-  function priceCalcLoop(
+  function priceCalc(
     int256[] memory priceData,
     uint256 bullEquity,
     uint256 bearEquity,
@@ -95,58 +96,53 @@ contract priceCalculator is Owned {
       uint256 multiplier = ivault.getMultiplier();
       uint256 totalEquity = ivault.getTotalEquity();
       uint256 movement;
-      uint256 bearKFactor;
-      uint256 bullKFactor;
+      uint256 bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
+      uint256 bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
       int256  signedPriceDelta;
       uint256 pricedelta;
-      for (uint i = 1; i < priceData.length; i++) {
-        //Grab k factor based on running equity
-        bullKFactor = getKFactor(bullEquity, bullEquity, bearEquity, totalEquity);
-        bearKFactor = getKFactor(bearEquity, bullEquity, bearEquity, totalEquity);
-        if(priceData[i-1] != priceData[i]) {
-          //Bearish movement, calc equity from the perspective of bull
-          if(priceData[i-1] > priceData[i]) {
-            //Treats 0 price value as 1, 0 causes divides by 0 error
-            if(priceData[i-1] == 0) priceData[i-1] = 1;
-            //Gets price change in absolute terms.
 
-            signedPriceDelta = priceData[i-1].sub(priceData[i]);
-            signedPriceDelta = signedPriceDelta.mul(smallFactor);
-            signedPriceDelta = signedPriceDelta.div(priceData[i-1]);
-            pricedelta = uint256(signedPriceDelta);
+      if(priceData[0] != priceData[1]) {
+        //Treats 0 price value as 1, 0 causes divides by 0 error
+        if(priceData[0] == 0) priceData[0] = 1;
+        //Bearish movement, calc equity from the perspective of bull
+        if(priceData[0] > priceData[1]) {
+          //Gets price change in absolute terms.
+          signedPriceDelta = priceData[0].sub(priceData[1]);
+          signedPriceDelta = signedPriceDelta.mul(smallFactor);
+          signedPriceDelta = signedPriceDelta.div(priceData[0]);
+          pricedelta = uint256(signedPriceDelta);
 
-            //Converts price change to be in terms of bull equity change
-            //As a percentage
-            pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(uSmallFactor);
-            //Dont allow loss to be greater than set loss limit
-            pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
-            //Calculate equity loss of bull equity
-            movement = bullEquity.mul(pricedelta);
-            movement = movement.div(uSmallFactor);
-            //Adds equity movement to running bear euqity and removes that
-            //Loss from running bull equity
-            bearEquity = bearEquity.add(movement);
-            bullEquity = totalEquity.sub(bearEquity);
-          }
-          //Bullish movement, calc equity from the perspective of bear
-          //Same process as above. only from bear perspective
-          else if(priceData[i-1] < priceData[i]) {
-            if(priceData[i-1] == 0) priceData[i-1] = 1;
+          //Converts price change to be in terms of bull equity change
+          //As a percentage
+          pricedelta = pricedelta.mul(multiplier.mul(bullKFactor)).div(uSmallFactor);
+          //Dont allow loss to be greater than set loss limit
+          pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+          //Calculate equity loss of bull equity
+          movement = bullEquity.mul(pricedelta);
+          movement = movement.div(uSmallFactor);
+          //Adds equity movement to running bear euqity and removes that
+          //Loss from running bull equity
+          bearEquity = bearEquity.add(movement);
+          bullEquity = totalEquity.sub(bearEquity);
+        }
+        //Bullish movement, calc equity from the perspective of bear
+        //Same process as above. only from bear perspective
+        else if(priceData[0] < priceData[1]) {
 
-            signedPriceDelta = priceData[i].sub(priceData[i-1]);
-            signedPriceDelta = signedPriceDelta.mul(smallFactor);
-            signedPriceDelta = signedPriceDelta.div(priceData[i-1]);
-            pricedelta = uint256(signedPriceDelta);
+          signedPriceDelta = priceData[1].sub(priceData[0]);
+          signedPriceDelta = signedPriceDelta.mul(smallFactor);
+          signedPriceDelta = signedPriceDelta.div(priceData[0]);
+          pricedelta = uint256(signedPriceDelta);
 
-            pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(uSmallFactor);
-            pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
-            movement = bearEquity.mul(pricedelta);
-            movement = movement.div(uSmallFactor);
-            bullEquity = bullEquity.add(movement);
-            bearEquity = totalEquity.sub(bullEquity);
-          }
+          pricedelta = pricedelta.mul(multiplier.mul(bearKFactor)).div(uSmallFactor);
+          pricedelta = pricedelta < lossLimit ? pricedelta : lossLimit;
+          movement = bearEquity.mul(pricedelta);
+          movement = movement.div(uSmallFactor);
+          bullEquity = bullEquity.add(movement);
+          bearEquity = totalEquity.sub(bullEquity);
         }
       }
+
       return(bullEquity, bearEquity);
   }
 
@@ -169,22 +165,22 @@ contract priceCalculator is Owned {
         bearEquity
         .mul(1 ether)
         .div(IERC20(bear).totalSupply().add(ivault.getLiqTokens(bear)));
-      uint256 bullLiqEquity =
+      uint256 bullTokenEquity =
         bullPrice
-        .mul(ivault.getLiqTokens(bull))
+        .mul(IERC20(bull).totalSupply())
         .div(1 ether);
-      uint256 bearLiqEquity =
+      uint256 bearTokenEquity =
         bearPrice
-        .mul(ivault.getLiqTokens(bear))
+        .mul(IERC20(bear).totalSupply())
         .div(1 ether);
 
       return([
         bullPrice,
         bearPrice,
-        bullLiqEquity,
-        bearLiqEquity,
-        bullEquity.sub(bullLiqEquity),
-        bearEquity.sub(bearLiqEquity)
+        bullEquity.sub(bullTokenEquity),
+        bearEquity.sub(bearTokenEquity),
+        bullTokenEquity,
+        bearTokenEquity
       ]);
   }
 

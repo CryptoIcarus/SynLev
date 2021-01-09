@@ -1,61 +1,65 @@
 //////////////////////////////////////////////////
-//SYNLEV PRICE AGGREGATOR CONTRACT V 1.1
+//SYNLEV PRICE AGGREGATOR CONTRACT V 1.3
 //////////////////////////
 
 pragma solidity >= 0.6.6;
 
 import './ownable.sol';
-import './libraries/SafeMath.sol';
-import './interfaces/AggregatorInterface.sol';
-import './interfaces/vaultInterface.sol';
+import './SafeMath.sol';
+import './SignedSafeMath.sol';
+import './AggregatorV2V3Interface.sol';
+import './vaultInterface.sol';
 
 contract priceAggregator is Owned {
   using SafeMath for uint256;
+  using SignedSafeMath for int256;
 
   constructor() public {
+    standardUpdateWindow = 10;
     refVault[0xFf40827Ee1c4Eb6052044101E1C6E28DBe1440e3].ref =
-      AggregatorInterface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
+      AggregatorV2V3Interface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
     refVault[0xA81f8460dE4008577e7e6a17708102392f9aD92D].ref =
-      AggregatorInterface(0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c);
+      AggregatorV2V3Interface(0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c);
   }
 
   struct vaultStruct{
-    AggregatorInterface ref;
+    AggregatorV2V3Interface ref;
+    uint80 updateWindow;
   }
 
   mapping(address => vaultStruct) public refVault;     //Vault address => vaultStruct
 
-  uint256 public maxUpdates = 10;
+  uint80 public standardUpdateWindow;
 
   function priceRequest(address vault, uint256 lastUpdated)
     public
     view
     returns(int256[] memory, uint256)
     {
-      uint256 currentRound = refVault[vault].ref.latestRound();
-      if(currentRound > lastUpdated + 10000) {
+      uint80 start = uint80(lastUpdated);
+      vaultStruct memory rVault = refVault[vault];
+      uint80 currentRound = uint80(rVault.ref.latestRound());
+      if(currentRound > lastUpdated) {
         int256[] memory pricearray = new int256[] (2);
-        pricearray[0] = refVault[vault].ref.getAnswer(lastUpdated);
-        pricearray[1] = refVault[vault].ref.getAnswer(currentRound);
-        return(pricearray, currentRound);
-      }
-      else if(currentRound > lastUpdated) {
-        uint256 pricearrayLength = currentRound.add(1).sub(lastUpdated);
-        pricearrayLength = pricearrayLength > maxUpdates ?
-        maxUpdates : pricearrayLength;
-        int256[] memory pricearray = new int256[] (pricearrayLength);
-        pricearray[0] = refVault[vault].ref.getAnswer(lastUpdated);
-        for(uint i = 1; i < pricearrayLength; i++) {
-          pricearray[pricearrayLength.sub(i)] =
-          refVault[vault].ref.getAnswer(currentRound.add(1).sub(i));
+        uint80 updateWindow = rVault.updateWindow != 0 ? rVault.updateWindow : standardUpdateWindow;
+        start = start < currentRound - updateWindow ? start : currentRound - updateWindow;
+        ( , pricearray[0], , , ) = rVault.ref.getRoundData(start);
+        int256 price;
+        for(uint80 i = 1; i < updateWindow; i++) {
+          ( , price, , , ) = rVault.ref.getRoundData(i + currentRound - updateWindow);
+          pricearray[1] = pricearray[1].add(price);
         }
+        pricearray[0] = pricearray[0].add(pricearray[1]);
+        ( , price, , , ) = rVault.ref.getRoundData(currentRound);
+        pricearray[1] = pricearray[1].add(price);
+        pricearray[0] = pricearray[0].div(updateWindow);
+        pricearray[1] = pricearray[1].div(updateWindow);
         return(pricearray, currentRound);
       }
       else {
         return(new int256[](0), currentRound);
       }
     }
-
 
   /*
    * @notice Returns false if the price is not updated on vault.
@@ -69,10 +73,14 @@ contract priceAggregator is Owned {
     else return(true);
   }
 
+  function setUpdateWindow(uint80 amount, address vault) public onlyOwner() {
+    require(amount >= 1);
+    refVault[vault].updateWindow = amount;
+  }
 
-  function setMaxUpdates(uint256 amount) public onlyOwner() {
-    require(amount > 1);
-    maxUpdates = amount;
+  function setStandardUpdateWindow(uint80 amount) public onlyOwner() {
+    require(amount >= 1);
+    standardUpdateWindow = amount;
   }
 
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -82,6 +90,6 @@ contract priceAggregator is Owned {
 
   //Can only be called by vault proxy, initiates pair
   function registerVaultAggregator(address aggregator) public {
-    refVault[msg.sender].ref = AggregatorInterface(aggregator);
+    refVault[msg.sender].ref = AggregatorV2V3Interface(aggregator);
   }
 }
