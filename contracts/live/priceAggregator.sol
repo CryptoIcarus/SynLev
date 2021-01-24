@@ -20,6 +20,9 @@ contract priceAggregator is Owned {
       AggregatorV2V3Interface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
     refVault[0xA81f8460dE4008577e7e6a17708102392f9aD92D].ref =
       AggregatorV2V3Interface(0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c);
+    refVault[0x19392DBeA0Cc2dE68c47D186903420F07d63917a].ref =
+      AggregatorV2V3Interface(0xA027702dbb89fbd58938e4324ac03B58d812b0E1);
+
   }
 
   struct vaultStruct{
@@ -39,7 +42,13 @@ contract priceAggregator is Owned {
       uint80 start = uint80(lastUpdated);
       vaultStruct memory rVault = refVault[vault];
       uint80 currentRound = uint80(rVault.ref.latestRound());
-      if(currentRound > lastUpdated) {
+      if(currentRound > lastUpdated + 10**4) {
+        int256[] memory pricearray = new int256[] (2);
+        ( , pricearray[0], , , ) = rVault.ref.getRoundData(start);
+        ( , pricearray[1], , , ) = rVault.ref.getRoundData(currentRound);
+        return(pricearray, currentRound);
+      }
+      else if(currentRound > lastUpdated) {
         int256[] memory pricearray = new int256[] (2);
         uint80 updateWindow = rVault.updateWindow != 0 ? rVault.updateWindow : standardUpdateWindow;
         start = start < currentRound - updateWindow ? start : currentRound - updateWindow;
